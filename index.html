@@ -134,8 +134,24 @@ To Do List:
     // Google Apps Script web app URL — the script holds the Airtable API key server-side
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1NUH28v9-9PSn8npb8du2om56fxwoYbNeGhQ_yaX701VaacmTWSXkCJfmgLYuGq_i/exec";
 
-    // Injected server-side by Code.gs based on the ?location= query param
-    const LOCATION = <?!= JSON.stringify(location) ?>;
+    // Maps the ?location= URL slug to the full location name used in QUESTIONS
+    // and stored in Airtable. Add an entry here for each kiosk.
+    const LOCATION_SLUGS = {
+      'bvac101': 'BVAC 101',
+      'woodshop':    'Wood Shop',
+      'hammond': 'Hammond',
+      // 'metal':       'Metal Fabrication',
+      // 'sewing':      'Sewing Studio',
+      // 'moldmaking':  'Mold Making Studio',
+      'glass':   'Glass Studio',
+      //'printmaking': 'Printmaking Studio',
+      // 'sculpture':   'Sculpture Studio',
+      // 'bvac135':     'BVAC 135',
+    };
+
+    // Read from ?location=<slug> in the page URL
+    const LOCATION_SLUG = new URLSearchParams(window.location.search).get('location');
+    const LOCATION = LOCATION_SLUGS[LOCATION_SLUG] || null;
 </script>
 
 <!-- ============================================================
@@ -239,11 +255,24 @@ function selectReason(btn, reason) {
 // RENDER QUESTIONS for the current LOCATION only
 // ----------------------------------------------------------
 window.onload = function () {
+    if (!LOCATION) {
+        renderInvalidLocation();
+        return;
+    }
     document.getElementById("locationTitle").textContent = LOCATION;
     document.getElementById("numberInput").focus();
     renderQuestions();
     scaleKiosk();
 };
+
+function renderInvalidLocation() {
+    const wrapper = document.getElementById('kiosk-wrapper');
+    wrapper.innerHTML = `
+        <h2>Unknown or missing "location" parameter.</h2>
+        <p>Valid options: ${Object.keys(LOCATION_SLUGS).join(', ')}</p>
+    `;
+    scaleKiosk();
+}
 
 // Helper function to convert answer text to image filename
 function answerToImageFilename(answer) {
@@ -381,7 +410,9 @@ async function submitForm() {
     try {
         // no-cors is required because the browser blocks the cross-origin redirect
         // that Apps Script uses internally; the response is unreadable but the
-        // request is still processed server-side.
+        // request is still processed server-side. Don't add a Content-Type header
+        // here — that would turn this into a "non-simple" CORS request requiring a
+        // preflight OPTIONS call, which Apps Script web apps don't handle.
         await fetch(APPS_SCRIPT_URL, {
             method: "POST",
             mode: "no-cors",
