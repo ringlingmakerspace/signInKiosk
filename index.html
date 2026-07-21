@@ -408,16 +408,18 @@ async function submitForm() {
     statusEl.textContent = "Submitting...";
 
     try {
-        // no-cors is required because the browser blocks the cross-origin redirect
-        // that Apps Script uses internally; the response is unreadable but the
-        // request is still processed server-side. Don't add a Content-Type header
-        // here — that would turn this into a "non-simple" CORS request requiring a
-        // preflight OPTIONS call, which Apps Script web apps don't handle.
-        await fetch(APPS_SCRIPT_URL, {
-            method: "POST",
-            mode: "no-cors",
-            body: JSON.stringify(payload)
-        });
+        // GET, not POST: Apps Script's /exec URL always 302-redirects to a
+        // googleusercontent.com URL to deliver its response, and a browser
+        // following that redirect downgrades POST to GET per the fetch spec,
+        // silently dropping the body before it reaches the script. GET survives
+        // the redirect intact, so the payload is sent as a query parameter.
+        const url = APPS_SCRIPT_URL + "?data=" + encodeURIComponent(JSON.stringify(payload));
+        const res = await fetch(url);
+        const result = await res.json();
+
+        if (!result.ok) {
+            throw new Error(result.error || "Unknown error");
+        }
 
         statusEl.style.color = "green";
         statusEl.textContent = "✓ Signed in! Enjoy your time in the shop!";
