@@ -1,6 +1,6 @@
 <!-- 
 To Do List:
-- [] Add a clear button to reset the form without submitting
+- [x] Add a clear button to reset the form without submitting
 - [x] Optimize images for the buttons
 - [x] Get text styling right (make it look good)
 - [x] Add images for vacuum former and CNC mill
@@ -110,10 +110,24 @@ To Do List:
         #questionsHeader {
             display: none;
         }
-        #submitBtn {
-            background-color: #6610f2;
+        #actionRow {
+            display: flex;
+            gap: 15px;
             margin-top: 20px;
             width: 95%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #submitBtn {
+            background-color: #6610f2;
+            flex: 1;
+            box-sizing: border-box;
+            padding: 50px 15px;
+        }
+        #clearBtn {
+            background-color: #6c757d;
+            width: 110px;
+            flex-shrink: 0;
             box-sizing: border-box;
             padding: 50px 15px;
         }
@@ -176,7 +190,10 @@ To Do List:
 <div id="questionsContainer"></div>
 
 <div id="statusMsg"></div>
-<button id="submitBtn" onclick="submitForm()">Submit</button>
+<div id="actionRow">
+    <button id="submitBtn" onclick="submitForm()">Submit</button>
+    <button id="clearBtn" onclick="clearForm()">Clear</button>
+</div>
 
 </div>
 <span> <p id="locationTitle"></p></span>
@@ -433,17 +450,25 @@ async function submitForm() {
 }
 
 // ----------------------------------------------------------
-// RESET after successful submission
+// RESET
 // ----------------------------------------------------------
+function clearFields() {
+    document.getElementById("numberInput").value = "";
+    document.getElementById("numberInput").focus();
+    document.getElementById("statusMsg").textContent = "";
+    selectedReason = null;
+    Object.keys(answers).forEach(k => delete answers[k]);
+    document.querySelectorAll('.reason-btn, .answer-buttons button, .single-select-btn').forEach(b => b.classList.remove('selected'));
+}
+
+// Called after a successful submission
 function resetForm() {
-    setTimeout(() => {
-        document.getElementById("numberInput").value = "";
-        document.getElementById("numberInput").focus();
-        document.getElementById("statusMsg").textContent = "";
-        selectedReason = null;
-        Object.keys(answers).forEach(k => delete answers[k]);
-        document.querySelectorAll('.reason-btn, .answer-buttons button, .single-select-btn').forEach(b => b.classList.remove('selected'));
-    }, 1000); // Adjust refresh delay as needed
+    setTimeout(clearFields, 1000); // Adjust refresh delay as needed
+}
+
+// Called when the visitor taps Clear to start over without submitting
+function clearForm() {
+    clearFields();
 }
 </script>
 </body>
