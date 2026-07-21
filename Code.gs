@@ -1,33 +1,10 @@
-// Maps the ?location= URL slug to the full location name used in QUESTIONS
-// (kioskCheckIn.html) and stored in Airtable. Add an entry here for each kiosk.
-const LOCATION_SLUGS = {
-  'bvac101': 'BVAC 101',
-  'woodshop':    'Wood Shop',
-  'hammond': 'Hammond',
-  // 'metal':       'Metal Fabrication',
-  // 'sewing':      'Sewing Studio',
-  // 'moldmaking':  'Mold Making Studio',
-  'glass':   'Glass Studio',
-  //'printmaking': 'Printmaking Studio',
-  // 'sculpture':   'Sculpture Studio',
-  // 'bvac135':     'BVAC 135',
-};
+// Secure relay: the kiosk page (hosted on GitHub Pages) POSTs sign-in data here so the
+// Airtable API key never has to live in client-side code.
 
 function doGet(e) {
-  const location = LOCATION_SLUGS[e.parameter.location];
-
-  if (!location) {
-    return HtmlService.createHtmlOutput(
-      'Unknown or missing "location" parameter. Valid options: ' + Object.keys(LOCATION_SLUGS).join(', ')
-    );
-  }
-
-  const template = HtmlService.createTemplateFromFile('kioskCheckIn');
-  template.location = location;
-
-  return template.evaluate()
-    .setTitle('Makerspace Sign-In')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return ContentService.createTextOutput(
+    'This endpoint is an Airtable relay for the Makerspace kiosk. It only accepts POST requests; the kiosk page itself is hosted on GitHub Pages.'
+  );
 }
 
 function submitToAirtable(data) {
