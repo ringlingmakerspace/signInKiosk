@@ -1,0 +1,417 @@
+<!-- 
+To Do List:
+- [] Add a clear button to reset the form without submitting
+- [x] Optimize images for the buttons
+- [x] Get text styling right (make it look good)
+- [x] Add images for vacuum former and CNC mill
+- [x] Create "sign in kiosk" folder in github repo and move this file and image folder there
+- [x] Create documentation for how to set up and maintain the kiosk:
+    - Hardware (computer, barcode scanner, etc)
+    - Documentation for this page and how it works with images
+    - Kiosk setup (e.g. how to set it to open this page on startup, how to hide the mouse cursor, etc)
+- [x] Format the extra questions data as needed for Airtable (currently just dumping the JSON, but we could get fancy and create separate fields for each question or something)
+- [] Add a "I don't have my ID" option that prompts for Ringling email
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Makerspace Sign-In</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #kiosk-wrapper {
+            transform-origin: top center;
+            padding-top: 40px;
+            padding-bottom: 20px;
+            box-sizing: border-box;
+        }
+        span {
+            visibility: hidden;
+            font-size: 2px;
+        }
+        input {
+            padding: 10px;
+            font-size: 24px;
+            text-align: center;
+            width: 250px;
+            margin-bottom: 1px;
+        }
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+        button {
+            padding: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            width: 30%;
+        }
+        .personal-btn  { background-color: #28a745; }
+        .academic-btn  { background-color: #007BFF;}
+        .work-btn      { background-color: #DC3545; }
+        button:hover   { opacity: 0.8; }
+
+        .reason-btn {
+            padding: 50px 15px;
+        }
+        .reason-btn.selected {
+            outline: 3px solid #000;
+            outline-offset: 2px;
+        }
+        .single-select-btn {
+            background-color: #6c757d;
+            padding: 50px 15px;
+        }
+        .single-select-btn.selected {
+            outline: 3px solid #000;
+            outline-offset: 2px;
+        }
+        .answer-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+        .answer-buttons button {
+            width: 230px;
+            height: 115px;
+            font-size: 22px;
+            font-weight: bold;
+            color: ghostwhite;
+            background-size: cover;
+            background-position: center;
+            text-shadow: 4px 4px 8px rgba(0, 0, 0, 1.7);
+        }
+        .answer-buttons button.selected {
+            outline: 3px solid #000;
+            outline-offset: 2px;
+        }
+        #questionsContainer > div + div {
+            margin-top: 45px;
+        }
+        #questionsHeader {
+            display: none;
+        }
+        #submitBtn {
+            background-color: #6610f2;
+            margin-top: 20px;
+            width: 95%;
+            box-sizing: border-box;
+            padding: 50px 15px;
+        }
+        #statusMsg {
+            margin-top: 20px;
+            font-size: 20px;
+            color: green;
+            min-height: 1.5em;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================================
+     CONFIGURATION
+     ============================================================ -->
+<script>
+    // Google Apps Script web app URL — the script holds the Airtable API key server-side
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1NUH28v9-9PSn8npb8du2om56fxwoYbNeGhQ_yaX701VaacmTWSXkCJfmgLYuGq_i/exec";
+
+    // Injected server-side by Code.gs based on the ?location= query param
+    const LOCATION = <?!= JSON.stringify(location) ?>;
+</script>
+
+<!-- ============================================================
+ PAGE CONTENT
+ ============================================================ -->
+
+<div id="kiosk-wrapper">
+
+<input type="text" id="numberInput" placeholder="Scan Your ID" minlength="6" maxlength="20" autofocus inputmode="none">
+
+<h2>What brings you in today?</h2>
+<div class="button-container">
+    <button class="personal-btn reason-btn" onclick="selectReason(this, 'Personal Project')">Personal Project</button>
+    <button class="academic-btn reason-btn" onclick="selectReason(this, 'Academic Project')">Academic Project</button>
+    <button class="work-btn reason-btn"     onclick="selectReason(this, 'Work')">Work</button>
+</div>
+<br>
+<hr>
+
+<h2 id="questionsHeader"></h2>
+
+<div id="questionsContainer"></div>
+
+<div id="statusMsg"></div>
+<button id="submitBtn" onclick="submitForm()">Submit</button>
+
+</div>
+<span> <p id="locationTitle"></p></span>
+
+<script>
+// ----------------------------------------------------------
+// QUESTIONS DATA MODEL
+// Add or remove locations/questions here as needed. Use the following format:
+// "Location Name": [ { question: "Question text?", field: "Airtable Field Name (must match exactly)", answers: ["Option 1", "Option 2"] }, ... ]
+// ----------------------------------------------------------
+const QUESTIONS = {
+    "BVAC 101": [
+        {
+            question: "What Letterpress equipment are you using?",
+            field: "Letterpress Equipment",
+            answers: ["Typesetting", "Presses", "Risograph", { label: "Guillotine/<br>Paper Cutter/<br>Board Shear", value: "Guillotine/Paper Cutter/Board Shear" }, "Bindery"]
+        },
+        {
+            question: "What Digital Fabrication Equipment are you using?",
+            field: "Digifab Equipment",
+            answers: ["Filament 3D Printer", "Resin 3D Printer", "Laser Cutter", "3D Scanner",{ label: "Vinyl Cutter/<br>Cricut", value: "Vinyl Cutter/Cricut" }, "Vacuum Former", "CNC Mill"]
+        }
+    ],
+    "Glass Studio": [
+        {
+            question: "Which shop are you using?",
+            field: "Glass Shop",
+            answers: ["Hot Shop", "Cold Shop"]
+        }
+    ],
+    "Hammond": [
+        {
+            // field: "Location" + type: "single" is a special combo: the selected
+            // studio overwrites the generic LOCATION value sent to Airtable (see
+            // submitForm's payload spread). Never pair field: "Location" with the
+            // default multi-select type, or an array gets written into Location.
+            question: "Which studio are you using?",
+            field: "Location",
+            type: "single",
+            required: true,
+            answers: ["Metal Fabrication", "Mold Making Studio", "Sewing Studio"]
+        }
+    ],
+};
+
+// ----------------------------------------------------------
+// STATE
+// ----------------------------------------------------------
+let selectedReason = null;
+const answers = {};  // { "Question text": "Selected answer" }
+
+// ----------------------------------------------------------
+// VIEWPORT SCALING — keeps all content on-screen without scrolling
+// ----------------------------------------------------------
+function scaleKiosk() {
+    const wrapper = document.getElementById('kiosk-wrapper');
+    wrapper.style.transform = 'scale(1)';
+    const scale = Math.min(
+        window.innerWidth  / wrapper.scrollWidth,
+        window.innerHeight / wrapper.scrollHeight
+    );
+    if (scale < 1) wrapper.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', scaleKiosk);
+
+// ----------------------------------------------------------
+// REASON SELECTION
+// ----------------------------------------------------------
+function selectReason(btn, reason) {
+    selectedReason = reason;
+    document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+}
+
+// ----------------------------------------------------------
+// RENDER QUESTIONS for the current LOCATION only
+// ----------------------------------------------------------
+window.onload = function () {
+    document.getElementById("locationTitle").textContent = LOCATION;
+    document.getElementById("numberInput").focus();
+    renderQuestions();
+    scaleKiosk();
+};
+
+// Helper function to convert answer text to image filename
+function answerToImageFilename(answer) {
+    return answer
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]/g, '-')
+        .replace(/\-+/g, '-')
+        .replace(/^\-|\-$/g, '') + '.jpg';
+}
+
+function renderQuestions() {
+    const header = document.getElementById("questionsHeader");
+    const container = document.getElementById("questionsContainer");
+    container.innerHTML = "";
+
+    const locationQs = QUESTIONS[LOCATION];
+    if (!locationQs || locationQs.length === 0) {
+        header.style.display = "none";
+        return;
+    }
+
+    header.style.display = "block";
+    locationQs.forEach((q, index) => {
+        const block = document.createElement("div");
+        const isSingle = q.type === "single";
+
+        let html = `<h3>${q.question}</h3>`;
+        html += `<div class="${isSingle ? "button-container" : "answer-buttons"}">`;
+
+        q.answers.forEach(answer => {
+            const value = typeof answer === 'object' ? answer.value : answer;
+            const label = typeof answer === 'object' ? answer.label : answer;
+            const safeId = `q${index}-${value}`.replace(/[^a-zA-Z0-9-_]/g, "_");
+
+            if (isSingle) {
+                html += `<button id="${safeId}" class="single-select-btn" onclick="recordAnswer('${q.field || q.question}', '${value}', '${index}', 'single')">${label}</button>`;
+            } else {
+                const imageUrl = `./images/${answerToImageFilename(value)}`;
+                html += `<button id="${safeId}" style="background-image: url('${imageUrl}')" onclick="recordAnswer('${q.field || q.question}', '${value}', '${index}', 'multi')">${label}</button>`;
+            }
+        });
+
+        html += `</div>`;
+        block.innerHTML = html;
+        container.appendChild(block);
+    });
+    scaleKiosk();
+}
+
+// ----------------------------------------------------------
+// RECORD ANSWER
+// ----------------------------------------------------------
+function recordAnswer(question, answer, questionIndex, type) {
+    if (type === 'single') {
+        // Exclusive single-select: store a scalar, highlight only the clicked button
+        answers[question] = answer;
+        document.querySelectorAll(`[id^="q${questionIndex}-"]`).forEach(b => b.classList.remove('selected'));
+        const safeId = `q${questionIndex}-${answer}`.replace(/[^a-zA-Z0-9-_]/g, "_");
+        document.getElementById(safeId).classList.add('selected');
+        return;
+    }
+
+    // Initialize as array if it doesnt exist
+    if (!answers[question]) {
+        answers[question] = [];
+    }
+
+    const index = answers[question].indexOf(answer);
+
+    // Toggle: add if not present, remove if present
+    if (index > -1) {
+        answers[question].splice(index, 1);
+    } else {
+        answers[question].push(answer);
+    }
+
+    // Toggle button highlight
+    const safeId = `q${questionIndex}-${answer}`.replace(/[^a-zA-Z0-9-_]/g, "_");
+    document.getElementById(safeId).classList.toggle('selected');
+}
+
+// ----------------------------------------------------------
+// SUBMIT
+// ----------------------------------------------------------
+async function submitForm() {
+    const statusEl = document.getElementById("statusMsg");
+    statusEl.style.color = "black";
+    statusEl.textContent = "";
+
+    const inputValue = document.getElementById("numberInput").value.trim();
+
+    if (inputValue.length < 6) {
+        statusEl.style.color = "red";
+        statusEl.textContent = "ID must be at least 6 digits.";
+        return;
+    }
+
+    if (!selectedReason) {
+        statusEl.style.color = "red";
+        statusEl.textContent = "Please select a reason for visit.";
+        return;
+    }
+
+    const locationQs = QUESTIONS[LOCATION] || [];
+    for (const q of locationQs) {
+        if (!q.required) continue;
+        const key = q.field || q.question;
+        const val = answers[key];
+        const answered = q.type === "single" ? !!val : Array.isArray(val) && val.length > 0;
+        if (!answered) {
+            statusEl.style.color = "red";
+            statusEl.textContent = "Please answer: " + q.question;
+            return;
+        }
+    }
+
+    const lastSix = inputValue.slice(-6);
+
+    const extraQuestions = { ...answers };
+    delete extraQuestions["Location"];
+
+    const payload = {
+        fields: {
+            "ID Number":        lastSix,
+            "Location":         LOCATION,
+            "Reason":           selectedReason,
+            "Extra Questions":  JSON.stringify(extraQuestions, null, 2), // Keeping this for now as a plaintext version of the equipment questions.
+            ...answers
+}
+    };
+
+    statusEl.textContent = "Submitting...";
+
+    try {
+        // no-cors is required because the browser blocks the cross-origin redirect
+        // that Apps Script uses internally; the response is unreadable but the
+        // request is still processed server-side.
+        await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            body: JSON.stringify(payload)
+        });
+
+        statusEl.style.color = "green";
+        statusEl.textContent = "✓ Signed in! Enjoy your time in the shop!";
+        resetForm();
+
+    } catch (e) {
+        statusEl.style.color = "red";
+        statusEl.textContent = "Error: " + e.message;
+        console.error(e);
+    }
+}
+
+// ----------------------------------------------------------
+// RESET after successful submission
+// ----------------------------------------------------------
+function resetForm() {
+    setTimeout(() => {
+        document.getElementById("numberInput").value = "";
+        document.getElementById("numberInput").focus();
+        document.getElementById("statusMsg").textContent = "";
+        selectedReason = null;
+        Object.keys(answers).forEach(k => delete answers[k]);
+        document.querySelectorAll('.reason-btn, .answer-buttons button, .single-select-btn').forEach(b => b.classList.remove('selected'));
+    }, 1000); // Adjust refresh delay as needed
+}
+</script>
+</body>
+</html>
