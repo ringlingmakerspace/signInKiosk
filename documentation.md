@@ -1,11 +1,11 @@
 # Makerspace Sign-In Kiosk
-This is a touchscreen sign-in system for Ringling College Makerspace facilities. Visitors use it to check in, select their reason for visiting, and indicate which equipment (or studio) they plan to use. All sign-in data is automatically saved to the Makerspace Airtable to track usage over time.
+This is a touchscreen sign-in system for [Ringling College Makerspace](https://sites.google.com/c.ringling.edu/makerspace/home). Visitors use it to check in, select their reason for visiting, and indicate which equipment (or studio) they plan to use. All sign-in data is automatically saved to the Makerspace Airtable to track usage over time.
 
 ---
 
 ## Table of Contents
 
-1. [How It Works (Overview)](#how-it-works-overview)
+1. [How It Works](#how-it-works)
 2. [What Each File Does](#what-each-file-does)
    - [`index.html` — The Kiosk Screen](#indexhtmlthe-kiosk-screen)
    - [`Code.gs` — The Secure Relay](#codegsthe-secure-relay)
@@ -27,7 +27,7 @@ This is a touchscreen sign-in system for Ringling College Makerspace facilities.
 
 ---
 
-## How It Works (Overview)
+## How It Works
 
 When a visitor walks up to a kiosk, here is what happens step by step:
 
@@ -37,11 +37,9 @@ When a visitor walks up to a kiosk, here is what happens step by step:
     - In studios that track equipment use, visitors tap one or more buttons to select which equipment they plan to use. Each button shows a photo or icon of that piece of equipment.
     - Some kiosks serve multiple studios. In this case, visitors will tap which studio they're using, and only one answer can be selected at a time.
 4. They tap **Submit**.
-5. The kiosk page (hosted on GitHub Pages) sends the sign-in information to a secure relay service (Google Apps Script), which passes it along to the Airtable database.
+5. The kiosk page sends the sign-in information to a secure relay service, which passes it along to the Airtable database.
 6. The screen shows a confirmation message, then resets automatically so it is ready for the next visitor.
 7. In Airtable, the incoming sign in record triggers an automation to link the barcode used to sign in to the visitor's user record, pulling the user's name and demographic information (year, department, etc.) into the sign in record.
-
-The entire check-in takes less than 30 seconds.
 
 ---
 
@@ -103,13 +101,17 @@ Current photos included:
 
 ### Airtable Automation
 
-The [Airtable automation]("insert airtable automation link here") helps to organize the incoming sign in records. The steps are as follows:
+The [Airtable automation](https://airtable.com/appYlpxOnZ8ypkFhb/wflGkgFQVWGjl3C8T) helps to organize the incoming sign in records. The steps are as follows:
+
 **Trigger:** When a record is created in the Sign In table.
-1. 
-2. Find the user record based on the incoming barcode
-3. Update the Sign In record with the link to the user, as well as, Major/Dept, Faculty/Student, Email, Semester, and Unique User ID fields.
-4. Conditional updates based on the Place Visited
-    - If place visited (from the trigger record) is ____, then update the Sign In record's Link to Studios field with the record ID matching the Studio.
+
+1. **Run a script:** The script matches the Location field to the correct Studio in the Studios table.
+2. **Update record:** Updates the timestamp field with the created date and links to the studio found in the scripting step.
+3. **Update record:** Updates the month, semester, and fiscal year fields. This could be done in the previous step, but it is broken out for troubleshooting purposes.
+4. Find the user record based on the incoming barcode
+- *Conditional Logic: If the number of records found in the previous step equals 1:*
+6. **Update record:** Update the Sign In record with the link to the user found in the previous step, as well as, Full Name, Major/Dept, Faculty/Student, and Unique User ID fields.
+- *If the number of records found in step 4 does not equal 1, then nothing happens. Records that meet these criteria are examined periodically to link them to user records.*
 ---
 
 ## Setting Up a New Kiosk
@@ -161,7 +163,7 @@ By default, question buttons are photo-backed and multi-select (a visitor can ta
 - `type: "single"` — renders plain colored buttons instead of photos, and only one answer can be selected at a time (like the Reason buttons at the top of the kiosk). Use this when there's no relevant photo, or the question is inherently one-choice-only.
 - `required: true` — blocks Submit with a red validation message until the visitor answers this question.
 
-**Worked example — the Hammond kiosk:** one physical kiosk (slug `hammond`, full name `"Hammond"`) serves three studios out of a single building. Rather than run three separate kiosks, it asks a required, single-select question:
+**Example — the Hammond kiosk:** one physical kiosk (slug `hammond`, full name `"Hammond"`) serves three studios out of a single building. Rather than run three separate kiosks, it asks a required, single-select question:
 
 ```js
 "Hammond": [
@@ -308,7 +310,6 @@ The following improvements are planned but not yet implemented:
 
 - **"I don't have my ID" option** — Allow a visitor to enter their Ringling email address instead of scanning an ID barcode.
 - **Clear / Reset button** — A visible button that lets a visitor start over if they made a mistake, without having to wait for the form to time out.
-- **Streamlined data transfer to Airtable** — Make sure the data coming from the sign in page are going to Airtable in the most efficient way. (Location, Equipment, etc.)
 - **Clearer Feedback** Have a more recognizable confirmation screen so people know when they are signed in.
 
 ---
