@@ -1,10 +1,32 @@
-// Secure relay: the kiosk page (hosted on GitHub Pages) POSTs sign-in data here so the
-// Airtable API key never has to live in client-side code.
-
+// Secure relay: the kiosk page (hosted on GitHub Pages) calls this so the Airtable
+// API key never has to live in client-side code.
+//
+// This uses GET, not POST. Apps Script's /exec URL always responds with a 302
+// redirect to a script.googleusercontent.com/macros/echo?... URL to deliver output —
+// that happens for every request, GET or POST. A browser fetch() automatically
+// follows that redirect, and per the HTTP/fetch spec a POST gets silently downgraded
+// to a GET on a 302, dropping the request body before it ever reaches doPost. GET
+// requests survive the redirect intact, so submissions are sent as a `data` query
+// parameter instead.
 function doGet(e) {
-  return ContentService.createTextOutput(
-    'This endpoint is an Airtable relay for the Makerspace kiosk. It only accepts POST requests; the kiosk page itself is hosted on GitHub Pages.'
-  );
+  const data = e.parameter.data;
+
+  if (!data) {
+    return ContentService.createTextOutput(
+      'This endpoint is an Airtable relay for the Makerspace kiosk. It only accepts requests with a "data" query parameter; the kiosk page itself is hosted on GitHub Pages.'
+    );
+  }
+
+  let result;
+  try {
+    result = { ok: true, record: submitToAirtable(JSON.parse(data)) };
+  } catch (err) {
+    result = { ok: false, error: err.message };
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function submitToAirtable(data) {
@@ -28,11 +50,4 @@ function submitToAirtable(data) {
     throw new Error('Airtable returned ' + resp.getResponseCode() + ': ' + resp.getContentText());
   }
   return JSON.parse(resp.getContentText());
-}
-
-function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  return ContentService
-    .createTextOutput(JSON.stringify(submitToAirtable(data)))
-    .setMimeType(ContentService.MimeType.JSON);
 }
