@@ -70,7 +70,9 @@ Key things this file controls:
 
 ### `Code.gs` — The Secure Relay
 
-This file has one job: when the visitor taps Submit, the kiosk page sends the sign-in data to this script's `doPost(e)`, which calls `submitToAirtable()`. That function adds the Airtable API key (read from Script Properties) and forwards everything to the database. The kiosk never has to handle the API key directly — if it were stored on the kiosk page instead, anyone who looked at the page's source code could find and misuse it.
+This file has one job: when the visitor taps Submit, the kiosk page sends the sign-in data to this script's `doGet(e)` as a `data` query parameter, which calls `submitToAirtable()`. That function adds the Airtable API key (read from Script Properties) and forwards everything to the database. The kiosk never has to handle the API key directly — if it were stored on the kiosk page instead, anyone who looked at the page's source code could find and misuse it.
+
+**Why GET instead of POST:** Apps Script's `/exec` URL always responds with a `302` redirect to a `script.googleusercontent.com/macros/echo?...` URL to deliver its output — this happens for every request, GET or POST. A browser's `fetch()` follows that redirect automatically, and per the HTTP/fetch spec a POST is silently downgraded to a GET when following a 302, which drops the request body before it ever reaches the script. A GET survives the redirect intact, so the kiosk sends the whole payload as a URL-encoded `data` parameter instead of a POST body. (There used to be a `doPost(e)` here — it's gone because it's structurally unreachable through a real cross-origin browser `fetch`, not because of anything wrong with the code in it.)
 
 ### `images/` folder — Equipment Photos
 
@@ -283,17 +285,17 @@ Make sure the kiosk's URL includes a `?location=<slug>` that matches an entry in
 - Confirm that the three Script Properties (API key, Base ID, Table name) are set correctly in Google Apps Script.
 - Check the receiving Airtable fields to make sure they match the form fields exactly. Spelling, capitalization, and spacing make a difference.
 
-**Making Apps Script access "Anyone" still doesn't fix missing Airtable records.**
-This is the most common gotcha and was the original reason this project split the kiosk page out from Apps Script. Two things to check:
-- **Access/execute-as changes only take effect on a *new* deployment version.** Editing an existing deployment's settings and clicking Save does *not* republish them to the live `/exec` URL — you must go through **Deploy → Manage deployments → Edit → New version → Deploy** (see [4. Set Up the Google Apps Script](#4-set-up-the-google-apps-script)).
-- **"Anyone with a Google account" is not the same as "Anyone."** With the former, an anonymous visitor's POST gets silently redirected to a Google sign-in page instead of reaching `doPost`. Because the kiosk's `fetch` call uses `mode: "no-cors"`, the browser can't detect that redirect — the kiosk still shows "✓ Signed in!" even though nothing reached Airtable.
-- To check for certain, bypass the `no-cors` opacity with a direct request instead of trusting the kiosk UI:
+**Submitting appears to succeed but no record ever shows up, and the Apps Script Executions log shows nothing ran.**
+This was the actual root cause behind the original "made it public and it broke" report, and it isn't an access-permission problem. Apps Script's `/exec` URL always 302-redirects to a `script.googleusercontent.com/macros/echo?...` URL to deliver its response — for every request, GET or POST. When a browser's `fetch()` follows that redirect, a POST gets silently downgraded to a GET (per the HTTP/fetch spec), which drops the request body before it ever reaches the script — so a function like `doPost` never runs, and the Executions log stays empty. This is why the relay now uses GET with the payload in a `data` query parameter (see [`Code.gs`](#codegsthe-secure-relay) above) — GET requests survive the redirect intact. If records still aren't arriving:
+- Confirm you can see the response, not just an "opaque" no-cors result: the kiosk's `submitForm()` now does `await fetch(url); await res.json()` and checks `result.ok` — a real error (bad API key, wrong table name, etc.) will show up as the red status message and in the browser console (F12 → Console), rather than silently reporting success.
+- To check the relay directly, hit it with a plain GET and read the JSON body:
   ```
-  curl -i -X POST '<your /exec URL>' \
-    -H 'Content-Type: text/plain' \
-    --data '{"fields":{"ID Number":"123456","Location":"Test","Reason":"Personal Project"}}'
+  curl -sL '<your /exec URL>?data=%7B%22fields%22%3A%7B%22ID%20Number%22%3A%22123456%22%2C%22Location%22%3A%22Test%22%2C%22Reason%22%3A%22Personal%20Project%22%7D%7D'
   ```
-  A working relay returns Airtable's JSON record body with a 200. An HTML response (a Google sign-in page) or a non-2xx status means the deployment's access setting or version is still wrong.
+  (that's `-L` to follow the redirect, and `?data=` holding `{"fields":{"ID Number":"123456","Location":"Test","Reason":"Personal Project"}}`, URL-encoded). A working relay returns `{"ok":true,"record":{...}}`; `{"ok":false,"error":"..."}` means Airtable rejected the request (check the error message); anything else means the deployment itself is misconfigured.
+
+**Making Apps Script access "Anyone" doesn't take effect.**
+Access and execute-as changes only apply on a *new* deployment version — editing an existing deployment's settings and clicking Save does *not* republish them to the live `/exec` URL. Go through **Deploy → Manage deployments → Edit → New version → Deploy** (see [4. Set Up the Google Apps Script](#4-set-up-the-google-apps-script)). Also double check "Anyone" is selected, not "Anyone with a Google account" — the latter requires a Google sign-in, which an anonymous kiosk visitor can't complete.
 
 **A visitor does not have their ID card.**
 Currently the kiosk requires a scanned ID number. A future version may allow visitors to type their Ringling email address instead (see Known Limitations below). As a temporary workaround, staff can manually enter a record into Airtable. Or visitors can use the old QR code sign in.
