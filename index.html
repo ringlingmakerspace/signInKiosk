@@ -10,7 +10,7 @@ To Do List:
     - Documentation for this page and how it works with images
     - Kiosk setup (e.g. how to set it to open this page on startup, how to hide the mouse cursor, etc)
 - [x] Format the extra questions data as needed for Airtable (currently just dumping the JSON, but we could get fancy and create separate fields for each question or something)
-- [] Add a "I don't have my ID" option that prompts for Ringling email
+- [x] Add a "I don't have my ID" option that prompts for Ringling email
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -137,6 +137,22 @@ To Do List:
             color: green;
             min-height: 1.5em;
         }
+        .toggle-link-btn {
+            display: inline-block;
+            width: auto;
+            background: none;
+            color: #007BFF;
+            font-size: 16px;
+            font-weight: normal;
+            text-decoration: underline;
+            padding: 8px 4px;
+            margin-top: 4px;
+            border-radius: 0;
+        }
+        .toggle-link-btn:hover {
+            opacity: 1;
+            color: #0056b3;
+        }
     </style>
 </head>
 <body>
@@ -175,7 +191,10 @@ To Do List:
 <div id="kiosk-wrapper">
 
 <input type="text" id="numberInput" placeholder="Scan Your ID" minlength="6" maxlength="20" autofocus inputmode="none">
-
+<br>
+<button type="button" id="idModeToggle" class="toggle-link-btn" onclick="toggleIdMode()">I don't have my ID</button>
+<br>
+<hr>
 <h2>What brings you in today?</h2>
 <div class="button-container">
     <button class="personal-btn reason-btn" onclick="selectReason(this, 'Personal Project')">Personal Project</button>
@@ -188,7 +207,8 @@ To Do List:
 <h2 id="questionsHeader"></h2>
 
 <div id="questionsContainer"></div>
-
+<br>
+<hr>
 <div id="statusMsg"></div>
 <div id="actionRow">
     <button id="submitBtn" onclick="submitForm()">Submit</button>
@@ -202,7 +222,7 @@ To Do List:
 // ----------------------------------------------------------
 // QUESTIONS DATA MODEL
 // Add or remove locations/questions here as needed. Use the following format:
-// "Location Name": [ { question: "Question text?", field: "Airtable Field Name (must match exactly)", answers: ["Option 1", "Option 2"] }, ... ]
+// "Location Name": [ { question: "Question text?", field: "Airtable Field Name (must match exactly!)", answers: ["Option 1", "Option 2"] }, ... ]
 // ----------------------------------------------------------
 const QUESTIONS = {
     "BVAC 101": [
@@ -243,7 +263,9 @@ const QUESTIONS = {
 // STATE
 // ----------------------------------------------------------
 let selectedReason = null;
+let usingEmail = false;
 const answers = {};  // { "Question text": "Selected answer" }
+const RINGLING_EMAIL_PATTERN = /^[^\s@]+@(ringling\.edu|c\.ringling\.edu)$/i;
 
 // ----------------------------------------------------------
 // VIEWPORT SCALING — keeps all content on-screen without scrolling
@@ -277,10 +299,43 @@ window.onload = function () {
         return;
     }
     document.getElementById("locationTitle").textContent = LOCATION;
+    applyInputMode();
     document.getElementById("numberInput").focus();
     renderQuestions();
     scaleKiosk();
 };
+
+// ----------------------------------------------------------
+// ID / EMAIL MODE TOGGLE
+// ----------------------------------------------------------
+function applyInputMode() {
+    const input = document.getElementById('numberInput');
+    const toggleBtn = document.getElementById('idModeToggle');
+
+    if (usingEmail) {
+        input.type = 'email';
+        input.placeholder = 'Enter Ringling Email';
+        input.removeAttribute('minlength');
+        input.removeAttribute('maxlength');
+        input.setAttribute('inputmode', 'email');
+        toggleBtn.textContent = 'Use ID Instead';
+    } else {
+        input.type = 'text';
+        input.placeholder = 'Scan Your ID';
+        input.setAttribute('minlength', '6');
+        input.setAttribute('maxlength', '20');
+        input.setAttribute('inputmode', 'none');
+        toggleBtn.textContent = "I don't have my ID";
+    }
+}
+
+function toggleIdMode() {
+    usingEmail = !usingEmail;
+    applyInputMode();
+    const input = document.getElementById('numberInput');
+    input.value = '';
+    input.focus();
+}
 
 function renderInvalidLocation() {
     const wrapper = document.getElementById('kiosk-wrapper');
@@ -382,7 +437,13 @@ async function submitForm() {
 
     const inputValue = document.getElementById("numberInput").value.trim();
 
-    if (inputValue.length < 6) {
+    if (usingEmail) {
+        if (!RINGLING_EMAIL_PATTERN.test(inputValue)) {
+            statusEl.style.color = "red";
+            statusEl.textContent = "Please enter a valid @ringling.edu or @c.ringling.edu email address.";
+            return;
+        }
+    } else if (inputValue.length < 6) {
         statusEl.style.color = "red";
         statusEl.textContent = "ID must be at least 6 digits.";
         return;
@@ -407,20 +468,23 @@ async function submitForm() {
         }
     }
 
-    const lastSix = inputValue.slice(-6);
-
     const extraQuestions = { ...answers };
     delete extraQuestions["Location"];
 
-    const payload = {
-        fields: {
-            "ID Number":        lastSix,
-            "Location":         LOCATION,
-            "Reason":           selectedReason,
-            "Extra Questions":  JSON.stringify(extraQuestions, null, 2), // Keeping this for now as a plaintext version of the equipment questions.
-            ...answers
-}
+    const fields = {
+        "Location":         LOCATION,
+        "Reason":           selectedReason,
+        "Extra Questions":  JSON.stringify(extraQuestions, null, 2), // Keeping this for now as a plaintext version of the equipment questions.
+        ...answers
     };
+
+    if (usingEmail) {
+        fields["Email"] = inputValue;
+    } else {
+        fields["ID Number"] = inputValue.slice(-6);
+    }
+
+    const payload = { fields };
 
     statusEl.textContent = "Submitting...";
 
@@ -453,6 +517,8 @@ async function submitForm() {
 // RESET
 // ----------------------------------------------------------
 function clearFields() {
+    usingEmail = false;
+    applyInputMode();
     document.getElementById("numberInput").value = "";
     document.getElementById("numberInput").focus();
     document.getElementById("statusMsg").textContent = "";

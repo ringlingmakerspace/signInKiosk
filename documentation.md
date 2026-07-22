@@ -65,6 +65,7 @@ Key things this file controls:
 - **Which equipment (or studio) options** are shown as buttons — this can be different per location, defined in the `QUESTIONS` object.
 - **The logic** for collecting the visitor's selections and sending them to the database.
 - **Auto-scaling** so the interface always fills the screen correctly, no matter what size display you use.
+- **The "I don't have my ID" toggle** — tapping it swaps the ID input into an email input (on-screen keyboard included) for visitors without their ID card. A submitted email must end in `@ringling.edu` or `@c.ringling.edu`, and is sent to Airtable's `Email` field instead of `ID Number`. The form always resets back to ID-scan mode after a successful submission.
 
 ### `Code.gs` — The Secure Relay
 
@@ -300,7 +301,7 @@ This was the actual root cause behind the original "made it public and it broke"
 Access and execute-as changes only apply on a *new* deployment version — editing an existing deployment's settings and clicking Save does *not* republish them to the live `/exec` URL. Go through **Deploy → Manage deployments → Edit → New version → Deploy** (see [4. Set Up the Google Apps Script](#4-set-up-the-google-apps-script)). Also double check "Anyone" is selected, not "Anyone with a Google account" — the latter requires a Google sign-in, which an anonymous kiosk visitor can't complete.
 
 **A visitor does not have their ID card.**
-Currently the kiosk requires a scanned ID number. A future version may allow visitors to type their Ringling email address instead (see Known Limitations below). As a temporary workaround, staff can manually enter a record into Airtable. Or visitors can use the old QR code sign in.
+Tap **"I don't have my ID"** next to the ID field — it switches to an email input where the visitor can type their Ringling email (`@ringling.edu` or `@c.ringling.edu`) instead. This is sent to Airtable's `Email` field rather than `ID Number`. As a fallback, staff can still manually enter a record into Airtable, or visitors can use the old QR code sign in.
 
 ---
 
@@ -308,7 +309,6 @@ Currently the kiosk requires a scanned ID number. A future version may allow vis
 
 The following improvements are planned but not yet implemented:
 
-- **"I don't have my ID" option** — Allow a visitor to enter their Ringling email address instead of scanning an ID barcode.
 - **Clear / Reset button** — A visible button that lets a visitor start over if they made a mistake, without having to wait for the form to time out.
 - **Clearer Feedback** Have a more recognizable confirmation screen so people know when they are signed in.
 
