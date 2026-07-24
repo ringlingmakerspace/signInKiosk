@@ -22,6 +22,8 @@ To Do List:
         html, body {
             margin: 0;
             padding: 0;
+        }
+        html.kiosk-mode, html.kiosk-mode body {
             width: 100vw;
             height: 100vh;
             overflow: hidden;
@@ -36,6 +38,12 @@ To Do List:
             padding-top: 40px;
             padding-bottom: 20px;
             box-sizing: border-box;
+        }
+        html:not(.kiosk-mode) #kiosk-wrapper {
+            max-width: 480px;
+            margin: 0 auto;
+            padding-left: 16px;
+            padding-right: 16px;
         }
         span {
             visibility: hidden;
@@ -182,6 +190,13 @@ To Do List:
     // Read from ?location=<slug> in the page URL
     const LOCATION_SLUG = new URLSearchParams(window.location.search).get('location');
     const LOCATION = LOCATION_SLUGS[LOCATION_SLUG] || null;
+
+    // ?kiosk=true switches on the fixed-screen, ID-scan-first kiosk preset.
+    // Default (no param, e.g. QR code links) is the phone preset: scrollable
+    // layout, email entry first.
+    const KIOSK_MODE = new URLSearchParams(window.location.search).get('kiosk') === 'true';
+    if (KIOSK_MODE) document.documentElement.classList.add('kiosk-mode');
+    const DEFAULT_USING_EMAIL = !KIOSK_MODE;
 </script>
 
 <!-- ============================================================
@@ -263,7 +278,7 @@ const QUESTIONS = {
 // STATE
 // ----------------------------------------------------------
 let selectedReason = null;
-let usingEmail = false;
+let usingEmail = DEFAULT_USING_EMAIL;
 const answers = {};  // { "Question text": "Selected answer" }
 const RINGLING_EMAIL_PATTERN = /^[^\s@]+@(ringling\.edu|c\.ringling\.edu)$/i;
 
@@ -271,6 +286,7 @@ const RINGLING_EMAIL_PATTERN = /^[^\s@]+@(ringling\.edu|c\.ringling\.edu)$/i;
 // VIEWPORT SCALING — keeps all content on-screen without scrolling
 // ----------------------------------------------------------
 function scaleKiosk() {
+    if (!KIOSK_MODE) return;
     const wrapper = document.getElementById('kiosk-wrapper');
     wrapper.style.transform = 'scale(1)';
     const scale = Math.min(
@@ -517,7 +533,10 @@ async function submitForm() {
 // RESET
 // ----------------------------------------------------------
 function clearFields() {
-    usingEmail = false;
+    if (KIOSK_MODE) {
+        usingEmail = false;  // shared kiosk: always default back to ID-scan for the next visitor
+    }
+    // phone preset: persist whichever mode this visitor last used
     applyInputMode();
     document.getElementById("numberInput").value = "";
     document.getElementById("numberInput").focus();
