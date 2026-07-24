@@ -47,7 +47,7 @@ When a visitor walks up to a kiosk, here is what happens step by step:
 
 ### `index.html` — The Kiosk Screen
 
-This is the main file that runs on the kiosk's screen. It is a single, fully static web page that handles everything the visitor sees and interacts with. It is hosted on GitHub Pages, and every kiosk's browser points at the same published URL — the URL's `?location=<slug>` query parameter tells the page which location to show, resolved entirely in the browser via the `LOCATION_SLUGS` map defined in this file:
+This is the main file that runs on the kiosk's screen (and, via a QR code, on a visitor's own phone). It is a single, fully static web page that handles everything the visitor sees and interacts with. It is hosted on GitHub Pages, and every kiosk's browser points at the same published URL — the URL's `?location=<slug>` query parameter tells the page which location to show, resolved entirely in the browser via the `LOCATION_SLUGS` map defined in this file:
 
 ```js
 const LOCATION_SLUGS = {
@@ -64,8 +64,12 @@ Key things this file controls:
 - **The layout and appearance** of all buttons, text, and colors on screen.
 - **Which equipment (or studio) options** are shown as buttons — this can be different per location, defined in the `QUESTIONS` object.
 - **The logic** for collecting the visitor's selections and sending them to the database.
-- **Auto-scaling** so the interface always fills the screen correctly, no matter what size display you use.
-- **The "I don't have my ID" toggle** — tapping it swaps the ID input into an email input (on-screen keyboard included) for visitors without their ID card. A submitted email must end in `@ringling.edu` or `@c.ringling.edu`, and is sent to Airtable's `Email` field instead of `ID Number`. The form always resets back to ID-scan mode after a successful submission.
+- **The `?kiosk=true` preset switch** — the page has two presets, chosen by whether `?kiosk=true` is present in the URL:
+  - **Kiosk preset** (`?kiosk=true`, used on the physical kiosk hardware): defaults to ID-scan mode, and auto-scales the whole page down (`scaleKiosk()`) so it fits one screen with no scrolling, no matter what size display you use.
+  - **Phone preset** (default — no `kiosk` param, used for the QR code visitors scan with their own phone): defaults to email-entry mode instead of ID-scan, and lets the page scroll normally at a readable size instead of auto-scaling.
+
+  Every physical kiosk's configured URL must include `&kiosk=true`, or it will show the phone preset instead. The QR code link should be the plain `?location=<slug>` URL with no `kiosk` param.
+- **The "I don't have my ID" toggle** — tapping it swaps the ID input into an email input (on-screen keyboard included) for visitors without their ID card. A submitted email must end in `@ringling.edu` or `@c.ringling.edu`, and is sent to Airtable's `Email` field instead of `ID Number`. On the kiosk preset, the form always resets back to ID-scan mode after a successful submission (so it's ready for the next walk-up visitor); on the phone preset, it stays in whichever mode (ID or email) that visitor last used.
 
 ### `Code.gs` — The Secure Relay
 
@@ -127,7 +131,7 @@ Every kiosk shares the same published `index.html` — you don't create a separa
 
 1. Open `index.html` and add a new entry to `LOCATION_SLUGS`: `'yourslug': 'Full Location Name'`. Write the full name exactly as you want it to appear in the database.
 2. Commit and push to `main`. GitHub Pages redeploys automatically — no Apps Script redeploy needed for this step.
-3. Point the kiosk's browser at `https://ringlingmakerspace.github.io/signInKiosk/?location=yourslug`.
+3. Point the kiosk's browser at `https://ringlingmakerspace.github.io/signInKiosk/?location=yourslug&kiosk=true`. The `kiosk=true` param is required on physical kiosk hardware — without it, the page shows the scrollable, email-first phone preset instead (see the `?kiosk=true` bullet above).
 
 **If your location needs equipment questions**, see [Adding or Changing Equipment Options](#adding-or-changing-equipment-options) below.
 
@@ -226,7 +230,7 @@ Windows 11 has a built-in feature called **Assigned Access** that locks the comp
 
 8. When asked to choose a kiosk type, select **"As a digital sign or interactive display."** This locks Edge to a single page with no address bar, back button, or way to navigate away. Click **Next**.
 
-9. Enter the address of the kiosk page: the GitHub Pages URL with the [slug](#adding-a-location-slug) for this kiosk's location, e.g. `https://ringlingmakerspace.github.io/signInKiosk/?location=bvac101`. Click **Next**.
+9. Enter the address of the kiosk page: the GitHub Pages URL with the [slug](#adding-a-location-slug) for this kiosk's location and `&kiosk=true`, e.g. `https://ringlingmakerspace.github.io/signInKiosk/?location=bvac101&kiosk=true`. Click **Next**.
 
 10. Set how many minutes of inactivity before the page automatically refreshes. **5 minutes** is a reasonable default for a busy space.
 
@@ -262,7 +266,7 @@ After restarting, Windows will automatically log in as the Kiosk user and open E
 1. In the repo, go to **Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to **Deploy from a branch**, and choose the `main` branch with the `/ (root)` folder.
 3. Confirm the published URL — it should be `https://ringlingmakerspace.github.io/signInKiosk/`.
-4. Every kiosk points its browser at this URL plus its `?location=<slug>` (see [Adding a Location Slug](#adding-a-location-slug)). If the Apps Script relay's `/exec` URL ever changes, update `APPS_SCRIPT_URL` in `index.html` and push — no other config lives outside these two files.
+4. Every kiosk points its browser at this URL plus its `?location=<slug>&kiosk=true` (see [Adding a Location Slug](#adding-a-location-slug)). The QR code for visitors to sign in from their own phone uses the same URL and slug, but without `kiosk=true`. If the Apps Script relay's `/exec` URL ever changes, update `APPS_SCRIPT_URL` in `index.html` and push — no other config lives outside these two files.
 
 ### 4. Set Up the Google Apps Script
 
@@ -314,4 +318,4 @@ The following improvements are planned but not yet implemented:
 
 ---
 
-*Last updated: July 21 2026*
+*Last updated: July 24 2026*
