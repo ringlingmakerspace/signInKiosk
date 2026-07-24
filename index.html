@@ -40,7 +40,7 @@ To Do List:
             box-sizing: border-box;
         }
         html:not(.kiosk-mode) #kiosk-wrapper {
-            max-width: min(95vw, 1080px);
+            max-width: min(95vw, 1920px);
             margin: 0 auto;
             padding-left: 16px;
             padding-right: 16px;
@@ -344,14 +344,14 @@ function applyInputMode() {
         input.removeAttribute('minlength');
         input.removeAttribute('maxlength');
         input.setAttribute('inputmode', 'email');
-        toggleBtn.textContent = 'Use ID Instead';
+        toggleBtn.textContent = 'Scan ID Instead';
     } else {
         input.type = 'text';
         input.placeholder = 'Scan Your ID';
         input.setAttribute('minlength', '6');
         input.setAttribute('maxlength', '20');
         input.setAttribute('inputmode', 'none');
-        toggleBtn.textContent = "I don't have my ID";
+        toggleBtn.textContent = "Use Email Instead";
     }
 }
 
