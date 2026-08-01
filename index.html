@@ -183,6 +183,22 @@
       // 'bvac135':     'BVAC 135',
     };
 
+    // Airtable record IDs (Studios table) for the "Link to Studios" field.
+    // Get a record ID from Airtable: open the record, "Copy record ID" from
+    // the row's expand menu. Fill in the TODO placeholders before relying on
+    // this in production — an unfilled placeholder will make Airtable reject
+    // the submission with an invalid-record-id error.
+    const STUDIO_RECORD_IDS = {
+      WOOD:   "recZVvPbXnAoEaMB4", // Wood
+      DGFB:   "recUgKjurOdEkNm7B", // Digital Fabrication
+      LTPR:   "recUMMQbSk01tsBKk", // Letterpress
+      MTFB:   "reciuw9kjGvsH6Nxo", // Metal Fabrication
+      MOLD:   "recp5KOVcfw6nvxss", // Mold Making
+      SEWI:   "recTFwOKPqiSRt6dp", // Sewing
+      GLSS:   "recSC45o6mTYvPsNk", // Glass
+      PRNT:   "recYxhG4dzNY9aswB" // Printmaking
+    };
+
     // Read from ?location=<slug> in the page URL
     const LOCATION_SLUG = new URLSearchParams(window.location.search).get('location');
     const LOCATION = LOCATION_SLUGS[LOCATION_SLUG] || null;
@@ -268,6 +284,19 @@ const QUESTIONS = {
             answers: ["Metal Fabrication", "Mold Making Studio", "Sewing Studio"]
         }
     ],
+};
+
+// Maps a location's full name to the Studio record(s) it links to in
+// Airtable. Keys must exactly match LOCATION_SLUGS / QUESTIONS full names
+// (same rule as documented for QUESTIONS). BVAC101 is handled separately
+// in getStudioRecordIds() since its studio depends on equipment answers,
+// not the location alone.
+const LOCATION_STUDIOS = {
+    "Wood Shop":          [STUDIO_RECORD_IDS.WOOD],
+    "Glass Studio":       [STUDIO_RECORD_IDS.GLASS],
+    "Metal Fabrication":  [STUDIO_RECORD_IDS.METAL],
+    "Mold Making Studio": [STUDIO_RECORD_IDS.MOLD],
+    "Sewing Studio":      [STUDIO_RECORD_IDS.SEWING],
 };
 
 // ----------------------------------------------------------
@@ -440,6 +469,28 @@ function recordAnswer(question, answer, questionIndex, type) {
 }
 
 // ----------------------------------------------------------
+// STUDIO RESOLUTION
+// ----------------------------------------------------------
+function getStudioRecordIds() {
+    if (LOCATION === "BVAC 101") {
+        const hasLetterpress = Array.isArray(answers["Letterpress Equipment"]) && answers["Letterpress Equipment"].length > 0;
+        const hasDigifab = Array.isArray(answers["Digifab Equipment"]) && answers["Digifab Equipment"].length > 0;
+
+        // Both selected, or neither selected: link both studios.
+        if (hasLetterpress === hasDigifab) {
+            return [STUDIO_RECORD_IDS.LTPR, STUDIO_RECORD_IDS.DGFB];
+        }
+        return [hasLetterpress ? STUDIO_RECORD_IDS.LTPR : STUDIO_RECORD_IDS.DGFB];
+    }
+
+    // Hammond's sub-studio question overwrites answers["Location"] with the
+    // specific studio actually used (see QUESTIONS.Hammond) — prefer that
+    // over the generic LOCATION when present.
+    const effectiveLocation = answers["Location"] || LOCATION;
+    return LOCATION_STUDIOS[effectiveLocation] || [];
+}
+
+// ----------------------------------------------------------
 // SUBMIT
 // ----------------------------------------------------------
 async function submitForm() {
@@ -484,10 +535,10 @@ async function submitForm() {
     delete extraQuestions["Location"];
 
     const fields = {
-        "Location":         LOCATION,
         "Reason":           selectedReason,
         "Extra Questions":  JSON.stringify(extraQuestions, null, 2), // Keeping this for now as a plaintext version of the equipment questions.
-        ...answers
+        "Link to Studios":  getStudioRecordIds(),
+        ...extraQuestions
     };
 
     if (usingEmail) {
