@@ -1,5 +1,5 @@
 # Makerspace Sign-In Kiosk
-This is a touchscreen sign-in system for [Ringling College Makerspace](https://sites.google.com/c.ringling.edu/makerspace/home). Visitors use it to check in, select their reason for visiting, and indicate which equipment (or studio) they plan to use. All sign-in data is automatically saved to the Makerspace Airtable to track usage over time.
+This is a touchscreen sign-in system for the [Ringling College Makerspace](https://sites.google.com/c.ringling.edu/makerspace/home). Visitors use it to check in, select their reason for visiting, and indicate which equipment (or studio) they plan to use. All sign-in data is automatically saved to the Makerspace Airtable to track usage over time.
 
 ---
 
@@ -41,6 +41,8 @@ When a visitor walks up to a kiosk, here is what happens step by step:
 6. The screen shows a confirmation message, then resets automatically so it is ready for the next visitor.
 7. In Airtable, the incoming sign in record triggers an automation to link the barcode used to sign in to the visitor's user record, pulling the user's name and demographic information (year, department, etc.) into the sign in record.
 
+The system is also set up to be accessible via a QR code that visitors can scan with their phones. The only change is that when a visitor scans the QR code, they type their Ringling email address into the input field instead of scanning their ID.
+
 ---
 
 ## What Each File Does
@@ -73,7 +75,7 @@ Key things this file controls:
 
 ### `Code.gs` — The Secure Relay
 
-This file has one job: when the visitor taps Submit, the kiosk page sends the sign-in data to this script's `doGet(e)` as a `data` query parameter, which calls `submitToAirtable()`. That function adds the Airtable API key (read from Script Properties) and forwards everything to the database. The kiosk never has to handle the API key directly — if it were stored on the kiosk page instead, anyone who looked at the page's source code could find and misuse it.
+This file is a Google Apps Script and has one job: when the visitor taps Submit, the kiosk page sends the sign-in data to this script's `doGet(e)` as a `data` query parameter, which calls `submitToAirtable()`. That function adds the Airtable API key (read from Script Properties) and forwards everything to the database. The kiosk never has to handle the API key directly — if it were stored on the kiosk page instead, anyone who looked at the page's source code could find and misuse it.
 
 **Why GET instead of POST:** Apps Script's `/exec` URL always responds with a `302` redirect to a `script.googleusercontent.com/macros/echo?...` URL to deliver its output — this happens for every request, GET or POST. A browser's `fetch()` follows that redirect automatically, and per the HTTP/fetch spec a POST is silently downgraded to a GET when following a 302, which drops the request body before it ever reaches the script. A GET survives the redirect intact, so the kiosk sends the whole payload as a URL-encoded `data` parameter instead of a POST body. (There used to be a `doPost(e)` here — it's gone because it's structurally unreachable through a real cross-origin browser `fetch`, not because of anything wrong with the code in it.)
 
@@ -107,6 +109,8 @@ Current photos included:
 ### Airtable Automation
 
 The [Airtable automation](https://airtable.com/appYlpxOnZ8ypkFhb/wflGkgFQVWGjl3C8T) helps to organize the incoming sign in records. The steps are as follows:
+
+![Alt text](./docs-images/Airtable Automation.png)
 
 **Trigger:** When a record is created in the Sign In table.
 
