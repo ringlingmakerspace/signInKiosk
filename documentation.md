@@ -110,16 +110,15 @@ Current photos included:
 
 The [Airtable automation](https://airtable.com/appYlpxOnZ8ypkFhb/wflGkgFQVWGjl3C8T) helps to organize the incoming sign in records. The steps are as follows:
 
-![Alt text](./docs-images/Airtable Automation.png)
+![Screenshot of the Airtable automation](./docs-images/airtable-automation.png)
 
 **Trigger:** When a record is created in the Sign In table.
 
-1. **Run a script:** The script matches the Location field to the correct Studio in the Studios table.
-2. **Update record:** Updates the timestamp field with the created date and links to the studio found in the scripting step.
-3. **Update record:** Updates the month, semester, and fiscal year fields. This could be done in the previous step, but it is broken out for troubleshooting purposes.
-4. Find the user record based on the incoming barcode
-- *Conditional Logic: If the number of records found in the previous step equals 1:*
-6. **Update record:** Update the Sign In record with the link to the user found in the previous step, as well as, Full Name, Major/Dept, Faculty/Student, and Unique User ID fields.
+1. **Update record:** Updates the timestamp field with the created date.
+2. **Update record:** Updates the month, semester, and fiscal year fields. This could be done in the previous step, but it is broken out for troubleshooting purposes.
+3. **Find records:** Find the user record based on the incoming barcode or email.
+- ***Conditional Logic:** If the number of records found in the previous step equals 1:*
+4. **Update record:** Update the Sign In record with the link to the user found in the previous step, as well as, Full Name, Major/Dept, Faculty/Student, and Unique User ID fields.
 - *If the number of records found in step 4 does not equal 1, then nothing happens. Records that meet these criteria are examined periodically to link them to user records.*
 ---
 
@@ -199,9 +198,7 @@ Once editing is complete, save the file and commit/push to `main` — GitHub Pag
 - A display device: a tablet or embedded panel PC. 
     - [This is the one](https://a.co/d/0bNqt34O) we are currently using. It runs Windows 11 and is set up for kiosk mode. See [Setting Up Windows 11 Kiosk Mode](#setting-up-windows-11-kiosk-mode) below.
 - A USB barcode scanner (configured to work as a keyboard — most do this by default).
-    - [Example scanner](https://a.co/d/0diFXhjX)
-    - [Another example](https://a.co/d/0diFXhjX)
-    - [Yet another](https://a.co/d/0diFXhjX)
+    - [This is the one](https://a.co/d/0diFXhjX) we are currently using.
 - Optional: A way to mount the display device. 
     - [Freestanding option.](https://a.co/d/0iHCw2E7)
     - [Wall-mounted option. (untested)](https://a.co/d/0feRnoVh)
@@ -238,7 +235,9 @@ Windows 11 has a built-in feature called **Assigned Access** that locks the comp
 
 10. Set how many minutes of inactivity before the page automatically refreshes. **5 minutes** is a reasonable default for a busy space.
 
-11. Click **Close**, then restart the computer.
+11. Change power settings so the kiosk always stays on and does not sleep or shut down automatically.
+
+12. Click **Close**, then restart the computer.
 
 After restarting, Windows will automatically log in as the Kiosk user and open Edge fullscreen to the sign-in page. The taskbar, Start menu, and all other Windows controls will be hidden from visitors.
 
@@ -280,8 +279,10 @@ After restarting, Windows will automatically log in as the Kiosk user and open E
 4. **Editing an existing deployment's settings and saving is not enough — you must create a New version (or a New deployment) for access or code changes to actually take effect on the live `/exec` URL.** This is the single most common cause of "the kiosk says it worked but nothing shows up in Airtable."
 5. Copy the resulting `/exec` URL. If `APPS_SCRIPT_URL` in `index.html` doesn't already match it, update it and push to `main`.
 
-### 5. Set Up the Airtable Automations
-Basically, if you changed any questions on the web page, you may need to make sure those changes are also made in Airtable. Table names, field names, field options, etc. all need to match perfectly.
+### 5. Set Up the Airtable Tables, Fields, and Automation
+
+Any information that is getting sent to Airtable must match Airtable ***exactly***, including spelling and capitalization. Make sure table names, field names, single and multiple select options,linked records, and anything else match perfectly. Basically, if you change any questions on the web page, you may need to make sure those changes are also made in Airtable and vice versa.
+
 ---
 
 ## Troubleshooting
@@ -309,7 +310,7 @@ This was the actual root cause behind the original "made it public and it broke"
 Access and execute-as changes only apply on a *new* deployment version — editing an existing deployment's settings and clicking Save does *not* republish them to the live `/exec` URL. Go through **Deploy → Manage deployments → Edit → New version → Deploy** (see [4. Set Up the Google Apps Script](#4-set-up-the-google-apps-script)). Also double check "Anyone" is selected, not "Anyone with a Google account" — the latter requires a Google sign-in, which an anonymous kiosk visitor can't complete.
 
 **A visitor does not have their ID card.**
-Tap **"I don't have my ID"** next to the ID field — it switches to an email input where the visitor can type their Ringling email (`@ringling.edu` or `@c.ringling.edu`) instead. This is sent to Airtable's `Email` field rather than `ID Number`. As a fallback, staff can still manually enter a record into Airtable, or visitors can use the old QR code sign in.
+Tap **"I don't have my ID"** next to the ID field — it switches to an email input where the visitor can type their Ringling email (`@ringling.edu` or `@c.ringling.edu`) instead. This is sent to Airtable's `Email` field rather than `ID Number`. As a fallback, staff can still manually enter a record into Airtable.
 
 ---
 
@@ -317,9 +318,8 @@ Tap **"I don't have my ID"** next to the ID field — it switches to an email in
 
 The following improvements are planned but not yet implemented:
 
-- **Clear / Reset button** — A visible button that lets a visitor start over if they made a mistake, without having to wait for the form to time out.
-- **Clearer Feedback** Have a more recognizable confirmation screen so people know when they are signed in.
+- **Clearer Feedback.** Have a more recognizable confirmation action so people know when they are signed in.
 
 ---
 
-*Last updated: July 24 2026*
+*Last updated: August 5, 2026*
