@@ -141,6 +141,83 @@
             color: green;
             min-height: 1.5em;
         }
+
+        /* ---- Full-screen feedback overlay ---- */
+        .feedback-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+            background: rgba(0,0,0,0.55);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .feedback-overlay.visible { opacity: 1; pointer-events: auto; }
+
+        .feedback-panel {
+            background: #fff;
+            border-radius: 16px;
+            padding: 40px 32px;
+            max-width: 90vw;
+            width: 480px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+            text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.25s ease;
+        }
+        .feedback-overlay.visible .feedback-panel { transform: scale(1); }
+
+        .feedback-overlay.state-loading .feedback-panel { border-top: 10px solid #6610f2; }
+        .feedback-overlay.state-success .feedback-panel { border-top: 10px solid #28a745; }
+        .feedback-overlay.state-fail    .feedback-panel { border-top: 10px solid #DC3545; }
+
+        .feedback-icon {
+            font-size: 72px;
+            line-height: 1;
+            margin-bottom: 12px;
+        }
+        .feedback-overlay.state-loading .feedback-icon { display: none; }
+        .feedback-overlay.state-success .feedback-icon { color: #28a745; animation: feedback-pop 0.35s ease; }
+        .feedback-overlay.state-fail    .feedback-icon { color: #DC3545; animation: feedback-pop 0.35s ease; }
+        @keyframes feedback-pop {
+            0%   { transform: scale(0.3); opacity: 0; }
+            60%  { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
+        .feedback-title    { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
+        .feedback-overlay.state-success .feedback-title { color: #1e7e34; }
+        .feedback-overlay.state-fail    .feedback-title { color: #a71d2a; }
+        .feedback-subtitle { font-size: 18px; color: #333; margin-bottom: 8px; }
+
+        .feedback-dots { display: none; gap: 10px; justify-content: center; margin: 16px 0 4px; }
+        .feedback-overlay.state-loading .feedback-dots { display: flex; }
+        .feedback-dots .dot {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #6610f2;
+            animation: feedback-bounce 1.1s infinite ease-in-out both;
+        }
+        .feedback-dots .dot:nth-child(1) { animation-delay: -0.24s; }
+        .feedback-dots .dot:nth-child(2) { animation-delay: -0.12s; }
+        .feedback-dots .dot:nth-child(3) { animation-delay: 0s; }
+        @keyframes feedback-bounce {
+            0%, 80%, 100% { transform: scale(0.5); opacity: 0.5; }
+            40%           { transform: scale(1); opacity: 1; }
+        }
+
+        .feedback-actions { display: none; gap: 12px; justify-content: center; margin-top: 20px; }
+        .feedback-overlay.state-fail .feedback-actions { display: flex; }
+        .feedback-btn { padding: 14px 20px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: #fff; }
+        .feedback-retry   { background: #6610f2; }
+        .feedback-dismiss { background: #6c757d; }
+        .feedback-btn:hover { opacity: 0.85; }
+        .feedback-overlay.no-retry .feedback-retry { display: none; }
+
         .toggle-link-btn {
             display: inline-block;
             width: auto;
@@ -184,9 +261,7 @@
 
     // Airtable record IDs (Studios table) for the "Link to Studios" field.
     // Get a record ID from Airtable: open the record, "Copy record ID" from
-    // the row's expand menu. Fill in the TODO placeholders before relying on
-    // this in production — an unfilled placeholder will make Airtable reject
-    // the submission with an invalid-record-id error.
+    // the row's expand menu.
     const STUDIO_RECORD_IDS = {
       WOOD:   "recEmA7YmwAZYwy4t", // Wood
       DGFB:   "rec8ZDPeTm5oqfTmm", // Digital Fabrication
@@ -242,6 +317,22 @@
 </div>
 
 </div>
+
+<div id="feedbackOverlay" class="feedback-overlay" role="alert" aria-live="assertive">
+  <div class="feedback-panel">
+    <div class="feedback-icon" id="feedbackIcon"></div>
+    <div class="feedback-title" id="feedbackTitle"></div>
+    <div class="feedback-subtitle" id="feedbackSubtitle"></div>
+    <div class="feedback-dots" id="feedbackDots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div class="feedback-actions" id="feedbackActions">
+      <button type="button" class="feedback-btn feedback-retry" onclick="retrySubmit()">Retry</button>
+      <button type="button" class="feedback-btn feedback-dismiss" onclick="dismissOverlay()">Dismiss</button>
+    </div>
+  </div>
+</div>
+
 <span> <p id="locationTitle"></p></span>
 
 <script>
@@ -307,6 +398,134 @@ const answers = {};  // { "Question text": "Selected answer" }
 const RINGLING_EMAIL_PATTERN = /^[^\s@]+@(ringling\.edu|c\.ringling\.edu)$/i;
 
 // ----------------------------------------------------------
+// AUDIO FEEDBACK (Web Audio API, synthesized tones — no audio files)
+// ----------------------------------------------------------
+let audioCtx = null;
+
+// Created/resumed lazily. Must be called synchronously from a user-gesture
+// handler (e.g. the very top of submitForm(), before any `await`) so Safari/
+// Chrome's autoplay-unlock rules are satisfied.
+function getAudioContext() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    if (!audioCtx) audioCtx = new AudioContextClass();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+}
+
+function playTone(ctx, freq, startTime, duration, type, peakGain) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.015);        // short attack, no click
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);  // smooth decay
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.02);
+}
+
+function playSuccessChime() {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    playTone(ctx, 880.00, now,        0.16, 'sine', 0.18); // A5
+    playTone(ctx, 1174.66, now + 0.14, 0.22, 'sine', 0.18); // D6, ascending
+}
+
+function playFailureTone() {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    playTone(ctx, 220.00, now,        0.28, 'square', 0.12); // A3
+    playTone(ctx, 174.61, now + 0.24, 0.32, 'square', 0.12); // F3, descending buzz
+}
+
+// ----------------------------------------------------------
+// FULL-SCREEN FEEDBACK OVERLAY
+// ----------------------------------------------------------
+let successDismissTimer = null;
+
+function showOverlay(state, { icon = '', title = '', subtitle = '', retry = true } = {}) {
+    const overlay = document.getElementById('feedbackOverlay');
+    overlay.classList.remove('state-loading', 'state-success', 'state-fail');
+    overlay.classList.add('state-' + state, 'visible');
+    overlay.classList.toggle('no-retry', !retry);
+    document.getElementById('feedbackIcon').textContent = icon;
+    document.getElementById('feedbackTitle').textContent = title;
+    document.getElementById('feedbackSubtitle').textContent = subtitle;
+}
+
+// Client-side validation problems (bad email, missing answers, etc.) reuse the
+// same prominent red overlay as a submit failure, minus Retry — there's no
+// network call to retry, the visitor just needs to fix the field and resubmit.
+function showValidationError(message) {
+    const statusEl = document.getElementById("statusMsg");
+    statusEl.style.color = "red";
+    statusEl.textContent = message;
+    playFailureTone();
+    showOverlay('fail', {
+        icon: '✗',
+        title: 'Please check your info',
+        subtitle: message,
+        retry: false
+    });
+}
+
+function hideOverlay() {
+    document.getElementById('feedbackOverlay').classList.remove('visible');
+    if (successDismissTimer) {
+        clearTimeout(successDismissTimer);
+        successDismissTimer = null;
+    }
+}
+
+// Failure overlay "Dismiss": close it, leave the form exactly as-is for editing/resubmit
+function dismissOverlay() {
+    hideOverlay();
+}
+
+// Failure overlay "Retry": close it and resubmit immediately with current field values
+function retrySubmit() {
+    hideOverlay();
+    submitForm();
+}
+
+// ----------------------------------------------------------
+// APPS SCRIPT WARM-UP PING
+// A GET with no `data` param hits Code.gs's early-return path (see doGet),
+// which never touches Airtable — safe to call repeatedly. cache: 'no-store'
+// keeps the browser from serving a cached response instead of actually
+// round-tripping to Apps Script, which would defeat the point.
+// ----------------------------------------------------------
+const WARM_UP_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes: shorter than Apps Script's idle window
+let warmUpIntervalId = null;
+
+function pingWarmUp() {
+    fetch(APPS_SCRIPT_URL, { cache: 'no-store' }).catch(() => {}); // fire-and-forget
+}
+
+function startWarmUpPings() {
+    if (warmUpIntervalId) return;
+    pingWarmUp();
+    warmUpIntervalId = setInterval(pingWarmUp, WARM_UP_INTERVAL_MS);
+}
+
+function stopWarmUpPings() {
+    if (warmUpIntervalId) {
+        clearInterval(warmUpIntervalId);
+        warmUpIntervalId = null;
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopWarmUpPings();
+    else startWarmUpPings();
+});
+
+// ----------------------------------------------------------
 // VIEWPORT SCALING — keeps all content on-screen without scrolling
 // ----------------------------------------------------------
 function scaleKiosk() {
@@ -343,6 +562,7 @@ window.onload = function () {
     document.getElementById("numberInput").focus();
     renderQuestions();
     scaleKiosk();
+    startWarmUpPings();
 };
 
 // ----------------------------------------------------------
@@ -493,6 +713,7 @@ function getStudioRecordIds() {
 // SUBMIT
 // ----------------------------------------------------------
 async function submitForm() {
+    getAudioContext(); // create/unlock inside the click's user-gesture window, before any await
     const statusEl = document.getElementById("statusMsg");
     statusEl.style.color = "black";
     statusEl.textContent = "";
@@ -501,19 +722,16 @@ async function submitForm() {
 
     if (usingEmail) {
         if (!RINGLING_EMAIL_PATTERN.test(inputValue)) {
-            statusEl.style.color = "red";
-            statusEl.textContent = "Please enter a valid @ringling.edu or @c.ringling.edu email address.";
+            showValidationError("Please enter a valid @ringling.edu or @c.ringling.edu email address.");
             return;
         }
     } else if (inputValue.length < 6) {
-        statusEl.style.color = "red";
-        statusEl.textContent = "ID must be at least 6 digits.";
+        showValidationError("ID must be at least 6 digits.");
         return;
     }
 
     if (!selectedReason) {
-        statusEl.style.color = "red";
-        statusEl.textContent = "Please select a reason for visit.";
+        showValidationError("Please select a reason for visit.");
         return;
     }
 
@@ -524,8 +742,7 @@ async function submitForm() {
         const val = answers[key];
         const answered = q.type === "single" ? !!val : Array.isArray(val) && val.length > 0;
         if (!answered) {
-            statusEl.style.color = "red";
-            statusEl.textContent = "Please answer: " + q.question;
+            showValidationError("Please answer: " + q.question);
             return;
         }
     }
@@ -549,6 +766,7 @@ async function submitForm() {
     const payload = { fields };
 
     statusEl.textContent = "Submitting...";
+    showOverlay('loading', { title: 'Submitting…', subtitle: 'Please wait a moment.' });
 
     try {
         // GET, not POST: Apps Script's /exec URL always 302-redirects to a
@@ -566,12 +784,27 @@ async function submitForm() {
 
         statusEl.style.color = "green";
         statusEl.textContent = "✓ Signed in! Enjoy your time in the shop!";
-        resetForm();
+        playSuccessChime();
+        showOverlay('success', {
+            icon: '✓',
+            title: 'Signed in!',
+            subtitle: 'Enjoy your time in the shop.'
+        });
+        successDismissTimer = setTimeout(() => {
+            hideOverlay();
+            resetForm();
+        }, 1800);
 
     } catch (e) {
         statusEl.style.color = "red";
         statusEl.textContent = "Error: " + e.message;
         console.error(e);
+        playFailureTone();
+        showOverlay('fail', {
+            icon: '✗',
+            title: 'Sign-in failed',
+            subtitle: e.message || 'Something went wrong. Please try again.'
+        });
     }
 }
 
@@ -592,9 +825,9 @@ function clearFields() {
     document.querySelectorAll('.reason-btn, .answer-buttons button, .single-select-btn').forEach(b => b.classList.remove('selected'));
 }
 
-// Called after a successful submission
+// Called once the success overlay's auto-dismiss timer fires
 function resetForm() {
-    setTimeout(clearFields, 1000); // Adjust refresh delay as needed
+    clearFields();
 }
 
 // Called when the visitor taps Clear to start over without submitting
