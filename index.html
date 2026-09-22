@@ -760,7 +760,7 @@ async function submitForm() {
     if (usingEmail) {
         fields["Email"] = inputValue;
     } else {
-        fields["ID Number"] = inputValue.slice(-6);
+        fields["ID Number"] = inputValue;
     }
 
     const payload = { fields };
