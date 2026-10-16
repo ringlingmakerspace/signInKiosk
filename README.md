@@ -203,6 +203,9 @@ Once editing is complete, save the file and commit/push to `main` — GitHub Pag
     - [Freestanding option.](https://a.co/d/0iHCw2E7)
     - [Wall-mounted option. (untested)](https://a.co/d/0feRnoVh)
 
+#### Setting Up Windows 11 without a Microsoft Account
+[This tutorial](https://pureinfotech.com/bypass-microsoft-account-setup-windows-11/#bypass_msa_oobe_HideOnlineAccountScreens) has worked for us in the past.
+
 #### Setting Up Windows 11 Kiosk Mode
 
 Windows 11 has a built-in feature called **Assigned Access** that locks the computer to run a single app — in this case, a web browser pointed at the sign-in page. Once enabled, the computer automatically logs in and opens the kiosk page every time it starts up. Visitors cannot access any other part of the computer.
