@@ -591,23 +591,30 @@ function fitEntryText() {
         - parseFloat(style.paddingRight)
         - 8;
 
-    input.style.fontSize = `${baseFontSize}px`;
     const textToFit = input.value || input.placeholder;
-    if (!textToFit || availableWidth <= 0) return;
+    if (availableWidth <= 0) return;
+    if (!textToFit) {
+        input.style.fontSize = `${baseFontSize}px`;
+        return;
+    }
 
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return;
     context.font = `${style.fontStyle} ${style.fontWeight} ${baseFontSize}px ${style.fontFamily}`;
 
+    const placeholderWidth = context.measureText(input.placeholder).width;
+    const placeholderFontSize = placeholderWidth > availableWidth
+        ? Math.max(minimumFontSize, baseFontSize * availableWidth / placeholderWidth)
+        : baseFontSize;
     const textWidth = context.measureText(textToFit).width;
-    if (textWidth > availableWidth) {
-        const fittedFontSize = Math.max(
-            minimumFontSize,
-            baseFontSize * availableWidth / textWidth
-        );
-        input.style.fontSize = `${fittedFontSize}px`;
-    }
+    const textFontSize = textWidth > availableWidth
+        ? baseFontSize * availableWidth / textWidth
+        : baseFontSize;
+    input.style.fontSize = `${Math.max(
+        minimumFontSize,
+        Math.min(placeholderFontSize, textFontSize)
+    )}px`;
 }
 
 function renderInvalidLocation() {
