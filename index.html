@@ -37,10 +37,15 @@
         }
         input {
             padding: 10px;
-            font-size: 24px;
+            --entry-base-font-size: 48px;
+            font-size: var(--entry-base-font-size);
             text-align: center;
-            width: 250px;
+            width: 100%;
             margin-bottom: 1px;
+        }
+        input.locked {
+            background-color: #e9f7ec;
+            border: 2px solid #28a745;
         }
         .button-container {
             display: flex;
@@ -218,22 +223,6 @@
         .feedback-btn:hover { opacity: 0.85; }
         .feedback-overlay.no-retry .feedback-retry { display: none; }
 
-        .toggle-link-btn {
-            display: inline-block;
-            width: auto;
-            background: none;
-            color: #007BFF;
-            font-size: 16px;
-            font-weight: normal;
-            text-decoration: underline;
-            padding: 8px 4px;
-            margin-top: 4px;
-            border-radius: 0;
-        }
-        .toggle-link-btn:hover {
-            opacity: 1;
-            color: #0056b3;
-        }
     </style>
 </head>
 <body>
@@ -291,9 +280,7 @@
 
 <div id="kiosk-wrapper">
 
-<input type="text" id="numberInput" placeholder="Scan Your ID" minlength="6" maxlength="20" autofocus inputmode="none">
-<br>
-<button type="button" id="idModeToggle" class="toggle-link-btn" onclick="toggleIdMode()">I don't have my ID</button>
+<input type="text" id="numberInput" placeholder="Please scan your ID" minlength="6" autofocus inputmode="none">
 <br>
 <hr>
 <h2>What brings you in today?</h2>
@@ -566,35 +553,60 @@ window.onload = function () {
 };
 
 // ----------------------------------------------------------
-// ID / EMAIL MODE TOGGLE
+// ID / EMAIL INPUT MODE
 // ----------------------------------------------------------
 function applyInputMode() {
     const input = document.getElementById('numberInput');
-    const toggleBtn = document.getElementById('idModeToggle');
-
+    
+    input.readOnly = false;                 
+    input.classList.remove('locked');       
+   
     if (usingEmail) {
         input.type = 'email';
-        input.placeholder = 'Enter Ringling Email';
+        input.placeholder = 'Please enter your Ringling email';
         input.removeAttribute('minlength');
         input.removeAttribute('maxlength');
         input.setAttribute('inputmode', 'email');
-        toggleBtn.textContent = 'Scan ID Instead';
     } else {
         input.type = 'text';
-        input.placeholder = 'Scan Your ID';
+        input.placeholder = 'Please scan your ID';
         input.setAttribute('minlength', '6');
-        input.setAttribute('maxlength', '12');
+        // input.setAttribute('maxlength', '12');
+        input.removeAttribute('maxlength');
         input.setAttribute('inputmode', 'none');
-        toggleBtn.textContent = "Use Email Instead";
     }
+    fitEntryText();
 }
 
-function toggleIdMode() {
-    usingEmail = !usingEmail;
-    applyInputMode();
+function fitEntryText() {
     const input = document.getElementById('numberInput');
-    input.value = '';
-    input.focus();
+    const style = window.getComputedStyle(input);
+    const baseFontSize = parseFloat(style.getPropertyValue('--entry-base-font-size'));
+    const minimumFontSize = 8;
+    if (!Number.isFinite(baseFontSize)) {
+        throw new Error('The entry input requires a valid --entry-base-font-size CSS value.');
+    }
+    const availableWidth = input.clientWidth
+        - parseFloat(style.paddingLeft)
+        - parseFloat(style.paddingRight)
+        - 8;
+
+    input.style.fontSize = `${baseFontSize}px`;
+    if (!input.value || availableWidth <= 0) return;
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.font = `${style.fontStyle} ${style.fontWeight} ${baseFontSize}px ${style.fontFamily}`;
+
+    const textWidth = context.measureText(input.value).width;
+    if (textWidth > availableWidth) {
+        const fittedFontSize = Math.max(
+            minimumFontSize,
+            baseFontSize * availableWidth / textWidth
+        );
+        input.style.fontSize = `${fittedFontSize}px`;
+    }
 }
 
 function renderInvalidLocation() {
@@ -708,7 +720,72 @@ function getStudioRecordIds() {
     const effectiveLocation = answers["Location"] || LOCATION;
     return LOCATION_STUDIOS[effectiveLocation] || [];
 }
+// ----------------------------------------------------------
+// BARCODE SCANNER HANDLING (ID mode only)
+// The scanner sends Tab/Enter after a scan. Lock the field then, so a
+// rescan can't be inserted into the middle of the existing number.
+// ----------------------------------------------------------
+const idInput = document.getElementById("numberInput");
+idInput.addEventListener("input", fitEntryText);
+window.addEventListener("resize", fitEntryText);
 
+
+// The '*' key is a convenient override for kiosk mode: it unlocks the ID field.
+// If the scanner can be configured to send a prefix character, this will automatically
+//  put the scanned barcode into the field, even if the cursor is not in the field.
+document.addEventListener("keydown", function (e) {
+    if (usingEmail) return;                       // never interfere with email entry
+    if (e.key !== "*") return;
+    e.preventDefault();
+    if (!usingEmail && idInput.readOnly) {
+        unlockIdInput();
+        idInput.value = "";
+    }
+    idInput.focus();
+});
+
+function lockIdInput() {
+    idInput.readOnly = true;
+    idInput.classList.add("locked");
+    idInput.blur();
+}
+
+function unlockIdInput() {
+    idInput.readOnly = false;
+    idInput.classList.remove("locked");
+}
+
+idInput.addEventListener("keydown", function (e) {
+    if (usingEmail) return;                       // never interfere with email entry
+    if (e.key === "Tab" || e.key === "Enter") {
+        e.preventDefault();
+        if (idInput.value.trim().length >= 6) {
+            lockIdInput();
+        } else {
+            idInput.value = "";                   // partial scan: start fresh
+        }
+    }
+});
+
+// While locked, the first character of a new scan clears the old number
+// and moves into the field, so the new scan replaces rather than appends.
+document.addEventListener("keydown", function (e) {
+    if (usingEmail || !idInput.readOnly) return;
+    const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+    if (isPrintable) {
+        unlockIdInput();
+        idInput.value = "";
+        idInput.focus();
+    }
+});
+
+// Tapping a locked field also resets it
+idInput.addEventListener("pointerdown", function () {
+    if (idInput.readOnly) {
+        unlockIdInput();
+        idInput.value = "";
+    }
+});
 // ----------------------------------------------------------
 // SUBMIT
 // ----------------------------------------------------------
@@ -818,6 +895,7 @@ function clearFields() {
     // phone preset: persist whichever mode this visitor last used
     applyInputMode();
     document.getElementById("numberInput").value = "";
+    fitEntryText();
     document.getElementById("numberInput").focus();
     document.getElementById("statusMsg").textContent = "";
     selectedReason = null;
