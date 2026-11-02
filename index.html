@@ -40,7 +40,7 @@
             --entry-base-font-size: 48px;
             font-size: var(--entry-base-font-size);
             text-align: center;
-            width: 100%;
+            width: 90%;
             margin-bottom: 1px;
         }
         input.locked {
@@ -592,14 +592,15 @@ function fitEntryText() {
         - 8;
 
     input.style.fontSize = `${baseFontSize}px`;
-    if (!input.value || availableWidth <= 0) return;
+    const textToFit = input.value || input.placeholder;
+    if (!textToFit || availableWidth <= 0) return;
 
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return;
     context.font = `${style.fontStyle} ${style.fontWeight} ${baseFontSize}px ${style.fontFamily}`;
 
-    const textWidth = context.measureText(input.value).width;
+    const textWidth = context.measureText(textToFit).width;
     if (textWidth > availableWidth) {
         const fittedFontSize = Math.max(
             minimumFontSize,
