@@ -68,10 +68,12 @@ Key things this file controls:
 - **The logic** for collecting the visitor's selections and sending them to the database.
 - **The `?kiosk=true` preset switch** — the page has two presets, chosen by whether `?kiosk=true` is present in the URL:
   - **Kiosk preset** (`?kiosk=true`, used on the physical kiosk hardware): defaults to ID-scan mode, and auto-scales the whole page down (`scaleKiosk()`) so it fits one screen with no scrolling, no matter what size display you use.
-  - **Phone preset** (default — no `kiosk` param, used for the QR code visitors scan with their own phone): defaults to email-entry mode instead of ID-scan, and lets the page scroll normally at a readable size instead of auto-scaling.
+  - **Phone preset** (default — no `kiosk` param, used for the QR code visitors scan with their own phone): defaults to email entry and lets the page scroll normally instead of auto-scaling.
 
   Every physical kiosk's configured URL must include `&kiosk=true`, or it will show the phone preset instead. The QR code link should be the plain `?location=<slug>` URL with no `kiosk` param.
-- **The "I don't have my ID" toggle** — tapping it swaps the ID input into an email input (on-screen keyboard included) for visitors without their ID card. A submitted email must end in `@ringling.edu` or `@c.ringling.edu`, and is sent to Airtable's `Email` field instead of `ID Number`. On the kiosk preset, the form always resets back to ID-scan mode after a successful submission (so it's ready for the next walk-up visitor); on the phone preset, it stays in whichever mode (ID or email) that visitor last used.
+- **Entry methods** — the kiosk preset uses ID entry, while the phone preset uses email entry. There is no control to switch between them. Phone visitors can enter a Ringling email ending in `@ringling.edu` or `@c.ringling.edu`; it is sent to Airtable's `Email` field instead of `ID Number`. 
+> [!IMPORTANT]
+> **Barcode Scanner Configuration** The kiosk barcode scanner should be configured to send the `*` character before each scan and finish entry with a `TAB` or `CR`. The `*` automatically highlights the ID number input so a scan will result in inputting the text, even if the input box is not focused and the `TAB` or `CR` shifts focus away from the input box and locks in the entry. Refocusing on the input box will clear the box to prevent partial overwriting of a previously scanned barcode.
 
 ### `Code.gs` — The Secure Relay
 
@@ -313,7 +315,7 @@ This was the actual root cause behind the original "made it public and it broke"
 Access and execute-as changes only apply on a *new* deployment version — editing an existing deployment's settings and clicking Save does *not* republish them to the live `/exec` URL. Go through **Deploy → Manage deployments → Edit → New version → Deploy** (see [4. Set Up the Google Apps Script](#4-set-up-the-google-apps-script)). Also double check "Anyone" is selected, not "Anyone with a Google account" — the latter requires a Google sign-in, which an anonymous kiosk visitor can't complete.
 
 **A visitor does not have their ID card.**
-Tap **"I don't have my ID"** next to the ID field — it switches to an email input where the visitor can type their Ringling email (`@ringling.edu` or `@c.ringling.edu`) instead. This is sent to Airtable's `Email` field rather than `ID Number`. As a fallback, staff can still manually enter a record into Airtable.
+Visitors using the phone QR code can enter their Ringling email (`@ringling.edu` or `@c.ringling.edu`), which is sent to Airtable's `Email` field rather than `ID Number`. The physical kiosk is set up for ID entry and does not have an entry-mode switch. As a fallback, staff can manually enter a record into Airtable.
 
 ---
 
