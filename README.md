@@ -61,6 +61,9 @@ const LOCATION_SLUGS = {
 
 To add a new kiosk location, add a new `'slug': 'Full Location Name'` entry here. If the slug is missing or doesn't match an entry, the page shows an inline error listing the valid options instead of the sign-in form.
 
+The Airtable `Payload` field contains a JSON archive of the complete submission fields.
+
+
 Key things this file controls:
 
 - **The layout and appearance** of all buttons, text, and colors on screen.
