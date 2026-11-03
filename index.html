@@ -837,7 +837,6 @@ async function submitForm() {
 
     const fields = {
         "Reason":           selectedReason,
-        "Extra Questions":  JSON.stringify(extraQuestions, null, 2), // Keeping this for now as a plaintext version of the equipment questions.
         "Link to Studios":  getStudioRecordIds(),
         ...extraQuestions
     };
@@ -849,6 +848,7 @@ async function submitForm() {
     }
 
     const payload = { fields };
+    fields["Payload"] = JSON.stringify(payload, null, 2);
 
     statusEl.textContent = "Submitting...";
     showOverlay('loading', { title: 'Submitting…', subtitle: 'Please wait a moment.' });
