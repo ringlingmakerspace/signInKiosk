@@ -73,7 +73,8 @@ Key things this file controls:
   Every physical kiosk's configured URL must include `&kiosk=true`, or it will show the phone preset instead. The QR code link should be the plain `?location=<slug>` URL with no `kiosk` param.
 - **Entry methods** — the kiosk preset uses ID entry, while the phone preset uses email entry. There is no control to switch between them. Phone visitors can enter a Ringling email ending in `@ringling.edu` or `@c.ringling.edu`; it is sent to Airtable's `Email` field instead of `ID Number`. 
 > [!IMPORTANT]
-> **Barcode Scanner Configuration** The kiosk barcode scanner should be configured to send the `*` character before each scan and finish entry with a `TAB` or `CR`. The `*` automatically highlights the ID number input so a scan will result in inputting the text, even if the input box is not focused and the `TAB` or `CR` shifts focus away from the input box and locks in the entry. Refocusing on the input box will clear the box to prevent partial overwriting of a previously scanned barcode.
+> #### Barcode Scanner Configuration
+> The kiosk barcode scanner should be configured to send the `*` character before each scan and finish entry with a `TAB` or `CR`. The `*` automatically highlights the ID number input so a scan will result in inputting the text, even if the input box is not focused and the `TAB` or `CR` shifts focus away from the input box and locks in the entry. Refocusing on the input box will clear the box to prevent partial overwriting of a previously scanned barcode.
 
 ### `Code.gs` — The Secure Relay
 
