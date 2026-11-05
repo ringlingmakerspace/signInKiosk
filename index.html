@@ -234,20 +234,6 @@
     // Google Apps Script web app URL — the script holds the Airtable API key server-side
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6tYaqU3AmBwxFJ5SIXfNgQyE8YntnxvkgUCTBURCVuEBGYvypjzqRDwo3C_PJu_pVcg/exec";
 
-    // Maps the ?location= URL slug to the full location name used in QUESTIONS
-    // and stored in Airtable. Add an entry here for each kiosk.
-    const LOCATION_SLUGS = {
-      'bvac101': 'BVAC 101',
-      'woodshop':    'Wood Shop',
-      'hammond': 'Hammond',
-      'metal':       'Metal Fabrication',
-      'sewing':      'Sewing Studio',
-      'moldmaking':  'Mold Making Studio',
-      'glass':   'Glass Studio',
-      //'printmaking': 'Printmaking Studio',
-      // 'bvac135':     'BVAC 135',
-    };
-
     // Airtable record IDs (Studios table) for the "Link to Studios" field.
     // Get a record ID from Airtable: open the record, "Copy record ID" from
     // the row's expand menu.
@@ -262,9 +248,38 @@
       PRNT:   "recBRAr0RfMUqk7Ub" // Printmaking
     };
 
-    // Read from ?location=<slug> in the page URL
-    const LOCATION_SLUG = new URLSearchParams(window.location.search).get('location');
-    const LOCATION = LOCATION_SLUGS[LOCATION_SLUG] || null;
+    // Each URL slug resolves directly to its display name and studio links.
+    // Locations with answer-dependent studio links define the relevant mapping
+    // here; getStudioRecordIds() applies it to the visitor's selections.
+    const LOCATIONS = {
+      'bvac101': {
+        name: 'BVAC 101',
+        studioRecordIdsByEquipment: {
+          'Letterpress Equipment': STUDIO_RECORD_IDS.LTPR,
+          'Digifab Equipment': STUDIO_RECORD_IDS.DGFB
+        }
+      },
+      'hammond': {
+        name: 'Hammond',
+        studioRecordIdsByAnswer: {
+          'Metal Fabrication': STUDIO_RECORD_IDS.MTFB,
+          'Mold Making Studio': STUDIO_RECORD_IDS.MOLD,
+          'Sewing Studio': STUDIO_RECORD_IDS.SEWI
+        }
+      },
+      'woodshop': { name: 'Wood Shop', studioRecordIds: [STUDIO_RECORD_IDS.WOOD] },
+      'metal': { name: 'Metal Fabrication', studioRecordIds: [STUDIO_RECORD_IDS.MTFB] },
+      'sewing': { name: 'Sewing Studio', studioRecordIds: [STUDIO_RECORD_IDS.SEWI] },
+      'moldmaking': { name: 'Mold Making Studio', studioRecordIds: [STUDIO_RECORD_IDS.MOLD] },
+      'glass': { name: 'Glass Studio', studioRecordIds: [STUDIO_RECORD_IDS.GLSS] },
+      'digifab': { name: 'Digital Fabrication' },
+      'letterpress': { name: 'Letterpress' }
+      //'printmaking': { name: 'Printmaking', studioRecordIds: [STUDIO_RECORD_IDS.PRNT] },
+      // 'bvac135': { name: 'BVAC 135' },
+    };
+
+    // Resolve the query slug once; use this entry for the rest of the page.
+    const LOCATION = LOCATIONS[new URLSearchParams(window.location.search).get('location')] || null;
 
     // ?kiosk=true switches on the fixed-screen, ID-scan-first kiosk preset.
     // Default (no param, e.g. QR code links) is the phone preset: scrollable
@@ -361,19 +376,6 @@ const QUESTIONS = {
             answers: ["Metal Fabrication", "Mold Making Studio", "Sewing Studio"]
         }
     ],
-};
-
-// Maps a location's full name to the Studio record(s) it links to in
-// Airtable. Keys must exactly match LOCATION_SLUGS / QUESTIONS full names
-// (same rule as documented for QUESTIONS). BVAC101 is handled separately
-// in getStudioRecordIds() since its studio depends on equipment answers,
-// not the location alone.
-const LOCATION_STUDIOS = {
-    "Wood Shop":          [STUDIO_RECORD_IDS.WOOD],
-    "Glass Studio":       [STUDIO_RECORD_IDS.GLSS],
-    "Metal Fabrication":  [STUDIO_RECORD_IDS.MTFB],
-    "Mold Making Studio": [STUDIO_RECORD_IDS.MOLD],
-    "Sewing Studio":      [STUDIO_RECORD_IDS.SEWI],
 };
 
 // ----------------------------------------------------------
@@ -544,7 +546,7 @@ window.onload = function () {
         renderInvalidLocation();
         return;
     }
-    document.getElementById("locationTitle").textContent = LOCATION;
+    document.getElementById("locationTitle").textContent = LOCATION.name;
     applyInputMode();
     document.getElementById("numberInput").focus();
     renderQuestions();
@@ -621,7 +623,7 @@ function renderInvalidLocation() {
     const wrapper = document.getElementById('kiosk-wrapper');
     wrapper.innerHTML = `
         <h2>Unknown or missing "location" parameter.</h2>
-        <p>Valid options: ${Object.keys(LOCATION_SLUGS).join(', ')}</p>
+        <p>Valid options: ${Object.keys(LOCATIONS).join(', ')}</p>
     `;
     scaleKiosk();
 }
@@ -641,7 +643,7 @@ function renderQuestions() {
     const container = document.getElementById("questionsContainer");
     container.innerHTML = "";
 
-    const locationQs = QUESTIONS[LOCATION];
+    const locationQs = QUESTIONS[LOCATION.name];
     if (!locationQs || locationQs.length === 0) {
         header.style.display = "none";
         return;
@@ -711,22 +713,25 @@ function recordAnswer(question, answer, questionIndex, type) {
 // STUDIO RESOLUTION
 // ----------------------------------------------------------
 function getStudioRecordIds() {
-    if (LOCATION === "BVAC 101") {
-        const hasLetterpress = Array.isArray(answers["Letterpress Equipment"]) && answers["Letterpress Equipment"].length > 0;
-        const hasDigifab = Array.isArray(answers["Digifab Equipment"]) && answers["Digifab Equipment"].length > 0;
+    if (LOCATION.studioRecordIdsByEquipment) {
+        const equipmentLinks = Object.entries(LOCATION.studioRecordIdsByEquipment);
+        const selectedStudioIds = equipmentLinks
+            .filter(([field]) => Array.isArray(answers[field]) && answers[field].length > 0)
+            .map(([, recordId]) => recordId);
 
-        // Both selected, or neither selected: link both studios.
-        if (hasLetterpress === hasDigifab) {
-            return [STUDIO_RECORD_IDS.LTPR, STUDIO_RECORD_IDS.DGFB];
-        }
-        return [hasLetterpress ? STUDIO_RECORD_IDS.LTPR : STUDIO_RECORD_IDS.DGFB];
+        // If no equipment is selected, retain the previous default of linking both studios.
+        return selectedStudioIds.length
+            ? selectedStudioIds
+            : equipmentLinks.map(([, recordId]) => recordId);
     }
 
-    // Hammond's sub-studio question overwrites answers["Location"] with the
-    // specific studio actually used (see QUESTIONS.Hammond) — prefer that
-    // over the generic LOCATION when present.
-    const effectiveLocation = answers["Location"] || LOCATION;
-    return LOCATION_STUDIOS[effectiveLocation] || [];
+    if (LOCATION.studioRecordIdsByAnswer) {
+        const selectedStudio = answers["Location"];
+        const recordId = LOCATION.studioRecordIdsByAnswer[selectedStudio];
+        return recordId ? [recordId] : [];
+    }
+
+    return LOCATION.studioRecordIds || [];
 }
 // ----------------------------------------------------------
 // BARCODE SCANNER HANDLING (ID mode only)
@@ -820,7 +825,7 @@ async function submitForm() {
         return;
     }
 
-    const locationQs = QUESTIONS[LOCATION] || [];
+    const locationQs = QUESTIONS[LOCATION.name] || [];
     for (const q of locationQs) {
         if (!q.required) continue;
         const key = q.field || q.question;
