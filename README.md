@@ -49,17 +49,17 @@ The system is also set up to be accessible via a QR code that visitors can scan 
 
 ### `index.html` — The Kiosk Screen
 
-This is the main file that runs on the kiosk's screen (and, via a QR code, on a visitor's own phone). It is a single, fully static web page that handles everything the visitor sees and interacts with. It is hosted on GitHub Pages, and every kiosk's browser points at the same published URL — the URL's `?location=<slug>` query parameter tells the page which location to show, resolved entirely in the browser via the `LOCATION_SLUGS` map defined in this file:
+This is the main file that runs on the kiosk's screen (and, via a QR code, on a visitor's own phone). It is a single, fully static web page that handles everything the visitor sees and interacts with. It is hosted on GitHub Pages, and every kiosk's browser points at the same published URL — the URL's `?location=<slug>` query parameter selects a complete location entry from the `LOCATIONS` map defined in this file:
 
 ```js
-const LOCATION_SLUGS = {
-  'bvac101': 'BVAC 101',
-  'woodshop': 'Wood Shop',
-  'hammond': 'Hammond',
+const LOCATIONS = {
+  'bvac101': { name: 'BVAC 101' },
+  'woodshop': { name: 'Wood Shop', studioRecordIds: [STUDIO_RECORD_IDS.WOOD] },
+  'hammond': { name: 'Hammond' },
 };
 ```
 
-To add a new kiosk location, add a new `'slug': 'Full Location Name'` entry here. If the slug is missing or doesn't match an entry, the page shows an inline error listing the valid options instead of the sign-in form.
+Each entry holds the location's display/Airtable name and, when applicable, the linked Airtable Studio record IDs. The page resolves the slug once and uses that entry for questions and studio links. If the slug is missing or doesn't match an entry, the page shows an inline error listing the valid options instead of the sign-in form.
 
 The Airtable `Payload` field contains a JSON archive of the complete submission fields.
 
@@ -138,7 +138,7 @@ Follow these steps in order to set up a sign-in kiosk at a new location.
 
 Every kiosk shares the same published `index.html` — you don't create a separate page per kiosk. Instead:
 
-1. Open `index.html` and add a new entry to `LOCATION_SLUGS`: `'yourslug': 'Full Location Name'`. Write the full name exactly as you want it to appear in the database.
+1. Open `index.html` and add a new entry to `LOCATIONS`, such as `'yourslug': { name: 'Full Location Name' }`. Write the name exactly as it appears in the database. If the location should link to a Studio record, include its ID as `studioRecordIds: [STUDIO_RECORD_IDS.KEY]`.
 2. Commit and push to `main`. GitHub Pages redeploys automatically — no Apps Script redeploy needed for this step.
 3. Point the kiosk's browser at `https://ringlingmakerspace.github.io/signInKiosk/?location=yourslug&kiosk=true`. The `kiosk=true` param is required on physical kiosk hardware — without it, the page shows the scrollable, email-first phone preset instead (see the `?kiosk=true` bullet above).
 
@@ -168,7 +168,7 @@ To add a new location or equipment group:
 4. Make sure the `field` value matches a column name you have created in Airtable.
 5. For each equipment option, add a matching photo to the `images/` folder. The filename should be the equipment name, all lowercase, with spaces replaced by hyphens and special characters removed. For example, "CNC Mill" becomes `cnc-mill.jpg`.
 
-**The location name in QUESTIONS must exactly match the full name produced by the corresponding `LOCATION_SLUGS` entry, also in `index.html`.** Capitalization and spacing matter.
+**The location name in QUESTIONS must exactly match the `name` in its `LOCATIONS` entry, also in `index.html`.** Capitalization and spacing matter.
 
 #### Single-Select / Required Questions
 
@@ -193,7 +193,7 @@ By default, question buttons are photo-backed and multi-select (a visitor can ta
 
 Giving the question `field: "Location"` is a special case: because the selected answer is a single string (thanks to `type: "single"`), it overwrites the kiosk's generic `"Location": "Hammond"` value when the submission is built, so Airtable records the specific studio instead of just "Hammond". **Only do this with `type: "single"`** — pairing `field: "Location"` with the default multi-select behavior would write an array into Airtable's Location field instead of a single studio name.
 
-If a studio in the Hammond building later gets its own dedicated kiosk, give it its own `LOCATION_SLUGS` entry (e.g. `'metal': 'Metal Fabrication'`) instead of adding a `QUESTIONS` entry — a location with no matching `QUESTIONS` key simply skips the extra-questions step.
+If a studio in the Hammond building later gets its own dedicated kiosk, give it its own `LOCATIONS` entry (e.g. `'metal': { name: 'Metal Fabrication', studioRecordIds: [STUDIO_RECORD_IDS.MTFB] }`) instead of adding a `QUESTIONS` entry — a location with no matching `QUESTIONS` key simply skips the extra-questions step.
 
 Once editing is complete, save the file and commit/push to `main` — GitHub Pages redeploys automatically.
 
@@ -297,7 +297,7 @@ Any information that is getting sent to Airtable must match Airtable ***exactly*
 ## Troubleshooting
 
 **The barcode scanner fills in the ID field, but then nothing happens.**
-Make sure the kiosk's URL includes a `?location=<slug>` that matches an entry in `index.html`'s `LOCATION_SLUGS`, and that the full name it maps to exactly matches a key in the `QUESTIONS` section of the same file.
+Make sure the kiosk's URL includes a `?location=<slug>` that matches an entry in `index.html`'s `LOCATIONS`, and that its `name` exactly matches a key in the `QUESTIONS` section of the same file.
 
 **Submitting does not save a record to Airtable.**
 - The submission success message on the web page just means the data was sent correctly. It doesn't mean that it was sent to the correct place or that the data was received.
