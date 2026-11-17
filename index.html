@@ -283,10 +283,7 @@
 <br>
 <hr>
 <h2>What brings you in today?</h2>
-<div class="button-container">
-    <button class="personal-btn reason-btn" onclick="selectReason(this, 'Personal Project')">Personal Project</button>
-    <button class="academic-btn reason-btn" onclick="selectReason(this, 'Academic Project')">Academic Project</button>
-</div>
+<div id="reasonButtons" class="button-container"></div>
 <br>
 <hr>
 
@@ -322,9 +319,16 @@
 
 <script>
 // ----------------------------------------------------------
-// QUESTIONS DATA MODEL
-// Add or remove locations/questions here as needed. Use the following format:
-// "Location Name": [ { question: "Question text?", field: "Airtable Field Name (must match exactly!)", answers: ["Option 1", "Option 2"] }, ... ]
+// CHOICES AND QUESTIONS DATA MODEL
+// Add or remove reason choices and locations/questions here as needed.
+// Choices can be strings (label and Airtable value match) or { label, value }
+// objects when the button text should differ from the value sent to Airtable.
+const REASONS = [
+    { label: "Personal Project", value: "Personal Project", className: "personal-btn" },
+    { label: "Academic/Ringling Project", value: "Academic Project", className: "academic-btn" }
+];
+
+// "Location Name": [ { question: "Question text?", field: "Airtable Field Name (must match exactly!)", answers: ["Option 1", { label: "Button text", value: "Airtable value" }] }, ... ]
 // ----------------------------------------------------------
 const QUESTIONS = {
     "BVAC 101": [
@@ -534,6 +538,18 @@ function selectReason(btn, reason) {
     btn.classList.add('selected');
 }
 
+function renderReasonButtons() {
+    const container = document.getElementById('reasonButtons');
+    REASONS.forEach(reason => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `${reason.className} reason-btn`;
+        button.textContent = reason.label;
+        button.addEventListener('click', () => selectReason(button, reason.value));
+        container.appendChild(button);
+    });
+}
+
 // ----------------------------------------------------------
 // RENDER QUESTIONS for the current LOCATION only
 // ----------------------------------------------------------
@@ -545,6 +561,7 @@ window.onload = function () {
     document.getElementById("locationTitle").textContent = LOCATION;
     applyInputMode();
     document.getElementById("numberInput").focus();
+    renderReasonButtons();
     renderQuestions();
     scaleKiosk();
     startWarmUpPings();
